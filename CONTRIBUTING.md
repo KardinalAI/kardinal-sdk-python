@@ -1,8 +1,25 @@
 # Contributing to the Kardinal Python SDK
 
-Notes for working on the SDK itself. For using it, see `README.md`.
+## Reporting a bug or asking for a change
 
-## Setup and checks
+Open an issue: https://github.com/KardinalAI/kardinal-sdk-python/issues.
+Include the SDK version (`kardinal version`, or
+`pip show kardinal-ai`), your Python version, and what you did, expected
+and got. Never paste your API key in an issue.
+
+Pull requests are not accepted for now: this GitHub repository is a
+read-only mirror of our internal repository, so a pull request opened here
+can't be merged. Please open an issue instead.
+
+For questions about your account, credits or quotas, contact
+customer.success@kardinal.ai.
+
+## For maintainers
+
+The rest of this file is for the team working on the SDK itself. For using
+it, see `README.md`.
+
+### Setup and checks
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -15,7 +32,7 @@ pytest -q
 CI runs `pytest -q` on every supported Python version (3.10 to 3.13, see
 `.gitlab-ci.yml`).
 
-## The spec
+### The spec
 
 `spec/openapi.yaml` is a copy of the `openapi.yaml` of the Kardinal API docs,
 whose source repository is internal (the published version is at
@@ -44,7 +61,7 @@ regeneration. Notes on generated models that pydantic specifically needs
 (not the API itself) live in `kardinal/routing/_annotations.py`, reapplied
 after every regeneration.
 
-## Code generation notes
+### Code generation notes
 
 - `scripts/generate_models.sh` passes `--disable-timestamp`:
   `datamodel-codegen` otherwise stamps a `# timestamp: ...` header that
@@ -69,7 +86,7 @@ after every regeneration.
 - The webhook endpoints are marked `x-excluded` in the spec and are not
   implemented by this SDK.
 
-## What we don't want
+### What we don't want
 
 The shape a full SDK generator would produce, which this SDK deliberately
 does not reproduce:
