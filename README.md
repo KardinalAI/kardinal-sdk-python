@@ -214,6 +214,8 @@ value: shrink the plan. For the daily/monthly quota, wait or ask for a
 higher one; for credits, top them up.
 
 ```python
+from kardinal import KardinalLimitError
+
 try:
     plan = k.routing.plans.submit(plan_input)
 except KardinalLimitError as e:
