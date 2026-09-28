@@ -1,0 +1,196 @@
+import pytest
+
+from kardinal._core.errors import (
+    KardinalAuthError,
+    KardinalConnectionError,
+    KardinalLimitError,
+    KardinalNotFoundError,
+    KardinalRateLimitError,
+    KardinalServerError,
+    KardinalValidationError,
+    from_response,
+)
+
+
+def _error(code: str) -> list:
+    return [{"code": code, "message": "boom"}]
+
+
+def test_not_authenticated_maps_to_kardinal_auth_error() -> None:
+    exc = from_response(status=401, request_id=None, errors=_error("NOT_AUTHENTICATED"))
+    assert isinstance(exc, KardinalAuthError)
+    assert exc.code == "NOT_AUTHENTICATED"
+
+
+def test_not_allowed_maps_to_kardinal_limit_error() -> None:
+    """For a builder account, NOT_ALLOWED only ever means a limit was hit —
+    plan size, optimization quota, or exhausted credits (confirmed by the
+    backend team): there's no permission refusal to confuse it with.
+    """
+    exc = from_response(status=403, request_id=None, errors=_error("NOT_ALLOWED"))
+    assert isinstance(exc, KardinalLimitError)
+    assert not isinstance(exc, KardinalAuthError)
+    assert exc.code == "NOT_ALLOWED"
+
+
+def test_plan_size_limit_is_a_limit_error_whatever_the_first_error_code() -> None:
+    """Observed live: exceeding a plan-size limit returns a 403 whose FIRST
+    error is INVALID_VALUE (the field and the limit), followed by the
+    NOT_ALLOWED that makes it a 403. The status decides the family, and
+    `.code`/`.details` come from the error that explains the 403.
+    """
+    errors = [
+        {
+            "code": "INVALID_VALUE",
+            "message": "The field value is not valid.",
+            "properties": {
+                "details": "The plan's number of resources (251) is greater than the allowed value (250)",
+                "path": "resources",
+            },
+        },
+        {
+            "code": "NOT_ALLOWED",
+            "message": "The requested action is not allowed.",
+            "properties": {"details": "The resulting plan violates the quotas configuration of the agency"},
+        },
+    ]
+    exc = from_response(status=403, request_id=None, errors=errors)
+    assert isinstance(exc, KardinalLimitError)
+    assert exc.code == "NOT_ALLOWED"
+    assert str(exc) == "The requested action is not allowed."
+    assert exc.details == "The resulting plan violates the quotas configuration of the agency"
+    assert exc.errors == errors
+
+
+def test_a_future_403_code_is_still_a_limit_error_and_becomes_the_code() -> None:
+    """The backend may add finer codes, still under 403 (e.g. for quotas or
+    credits): they must land in KardinalLimitError without an SDK change.
+    """
+    errors = [
+        {"code": "INVALID_VALUE", "message": "bad", "properties": {"path": "resources"}},
+        {"code": "QUOTA_EXCEEDED", "message": "quota"},
+    ]
+    exc = from_response(status=403, request_id=None, errors=errors)
+    assert isinstance(exc, KardinalLimitError)
+    assert exc.code == "QUOTA_EXCEEDED"
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "INVALID_INPUT",
+        "ID_NOT_UNIQUE",
+        "KEYS_NOT_UNIQUE",
+        "INVALID_ID_REFERENCE",
+        "INVALID_VALUE",
+        "PRECONDITION_FAILED",
+        "NOT_IMPLEMENTED",
+    ],
+)
+def test_business_validation_codes_map_to_kardinal_validation_error(code) -> None:
+    exc = from_response(status=400, request_id=None, errors=_error(code))
+    assert isinstance(exc, KardinalValidationError)
+    assert exc.errors == _error(code)
+
+
+def test_internal_server_error_code_maps_to_kardinal_server_error() -> None:
+    exc = from_response(status=500, request_id=None, errors=_error("INTERNAL_SERVER_ERROR"))
+    assert isinstance(exc, KardinalServerError)
+
+
+def test_unrecognized_code_falls_back_to_the_family_matching_http_status() -> None:
+    """openapi.yaml documents that new business codes may be added in a
+    future non-breaking release — an unrecognized code must not disappear,
+    it should fall back to the family its HTTP status implies.
+    """
+    exc = from_response(status=404, request_id=None, errors=_error("SOME_FUTURE_CODE"))
+    assert isinstance(exc, KardinalNotFoundError)
+    assert exc.code == "SOME_FUTURE_CODE"
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_family"),
+    [
+        (401, KardinalAuthError),
+        (403, KardinalLimitError),
+        (404, KardinalNotFoundError),
+        (429, KardinalRateLimitError),
+        (500, KardinalServerError),
+        (502, KardinalServerError),
+        (418, KardinalValidationError),  # anything else defaults to validation
+    ],
+)
+def test_family_for_status_covers_every_status_bucket(status, expected_family) -> None:
+    exc = from_response(status=status, request_id=None, errors=_error("SOME_FUTURE_CODE"))
+    assert isinstance(exc, expected_family)
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_code"),
+    [
+        (401, "NOT_AUTHENTICATED"),
+        (403, "NOT_ALLOWED"),
+        (404, "NOT_FOUND"),
+        (429, "RATE_LIMITED"),
+        (500, "INTERNAL_SERVER_ERROR"),
+        (418, "INVALID_INPUT"),
+    ],
+)
+def test_synthetic_code_used_when_response_carries_no_error_envelope(
+    status, expected_code
+) -> None:
+    """A 429, in particular, is documented as carrying no error envelope at
+    all — `.code` must still be set to something meaningful.
+    """
+    exc = from_response(status=status, request_id=None, errors=[])
+    assert exc.code == expected_code
+    assert exc.status == status
+
+
+@pytest.mark.parametrize("status", [429, 500, 502, 503])
+def test_retryable_is_true_for_429_and_5xx(status) -> None:
+    exc = from_response(status=status, request_id=None, errors=[])
+    assert exc.retryable is True
+
+
+@pytest.mark.parametrize("status", [400, 401, 403, 404])
+def test_retryable_is_false_below_429(status) -> None:
+    exc = from_response(status=status, request_id=None, errors=[])
+    assert exc.retryable is False
+
+
+def test_connection_error_is_not_constructed_by_from_response() -> None:
+    # KardinalConnectionError is client-side only (no HTTP response backs
+    # it) — Transport raises it directly, never through from_response().
+    assert KardinalConnectionError not in (
+        type(from_response(status=s, request_id=None, errors=[])) for s in (401, 404, 429, 500)
+    )
+
+
+def test_every_family_carries_the_full_errors_list_and_details() -> None:
+    """Every limit (plan size, daily quota, credits) is `403 NOT_ALLOWED`:
+    only `properties.details` tells them apart, so it must reach every
+    exception, not just `KardinalValidationError`.
+    """
+    errors = [
+        {
+            "code": "NOT_ALLOWED",
+            "message": "The requested action is not allowed.",
+            "properties": {"details": "Monthly credit quota exhausted"},
+        }
+    ]
+    exc = from_response(status=403, request_id=None, errors=errors)
+    assert isinstance(exc, KardinalLimitError)
+    assert exc.errors == errors
+    assert exc.details == "Monthly credit quota exhausted"
+
+
+def test_details_is_none_without_an_error_envelope() -> None:
+    exc = from_response(status=429, request_id=None, errors=[])
+    assert exc.errors == []
+    assert exc.details is None
+
+
+def test_details_is_none_when_the_first_error_has_no_properties() -> None:
+    exc = from_response(status=404, request_id=None, errors=_error("NOT_FOUND"))
+    assert exc.details is None

@@ -1,0 +1,21 @@
+stages:
+  - test
+
+# Every Python version pyproject.toml declares support for (requires-python
+# and the classifiers): the floor is only a promise if CI runs it.
+test:
+  stage: test
+  image: python:$PYTHON_VERSION
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ["3.10", "3.11", "3.12", "3.13"]
+  before_script:
+    - python -m venv .venv
+    - source .venv/bin/activate
+    - pip install -q -e ".[dev]"
+  script:
+    - source .venv/bin/activate
+    # The whole suite, including the README quickstart, the reproducible
+    # model regeneration check (test_models_no_diff), test_no_extra_allow and
+    # test_error_hierarchy.
+    - pytest -q

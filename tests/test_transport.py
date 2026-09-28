@@ -1,0 +1,119 @@
+import httpx
+import pytest
+import respx
+
+from kardinal._core.errors import KardinalError, KardinalServerError
+from kardinal._core.transport import DEFAULT_BASE_URL, Transport, resolve_base_url
+
+_ENV_VAR_URL = "https://api.example.com/v2"
+_EXPLICIT_URL = "https://api.example.org/v2"
+
+
+def test_resolve_base_url_prefers_explicit_argument(monkeypatch) -> None:
+    monkeypatch.setenv("KARDINAL_BASE_URL", _ENV_VAR_URL)
+    assert resolve_base_url(_EXPLICIT_URL) == _EXPLICIT_URL
+
+
+def test_resolve_base_url_falls_back_to_env_var(monkeypatch) -> None:
+    monkeypatch.setenv("KARDINAL_BASE_URL", _ENV_VAR_URL)
+    assert resolve_base_url(None) == _ENV_VAR_URL
+
+
+def test_resolve_base_url_falls_back_to_production(monkeypatch) -> None:
+    monkeypatch.delenv("KARDINAL_BASE_URL", raising=False)
+    assert resolve_base_url(None) == DEFAULT_BASE_URL
+
+
+def _transport() -> Transport:
+    return Transport(api_key="test-key")
+
+
+@respx.mock
+def test_get_is_retried_and_succeeds_after_a_5xx(monkeypatch) -> None:
+    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt: None)
+    route = respx.get(f"{DEFAULT_BASE_URL}/plans/p1").mock(
+        side_effect=[
+            httpx.Response(503),
+            httpx.Response(200, json={"ok": True}),
+        ]
+    )
+    result = _transport().request("GET", "/plans/p1")
+    assert result == {"ok": True}
+    assert route.call_count == 2
+
+
+@respx.mock
+def test_post_is_not_retried_on_a_5xx(monkeypatch) -> None:
+    """No Idempotency-Key in the spec: retrying a POST after a 5xx could
+    double-create a plan, so it must fail on the first 5xx, not retry.
+    """
+    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt: None)
+    route = respx.post(f"{DEFAULT_BASE_URL}/plans").mock(
+        return_value=httpx.Response(503)
+    )
+    with pytest.raises(KardinalServerError):
+        _transport().request("POST", "/plans", json={})
+    assert route.call_count == 1
+
+
+@respx.mock
+def test_get_gives_up_after_max_retries(monkeypatch) -> None:
+    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt: None)
+    route = respx.get(f"{DEFAULT_BASE_URL}/plans/p1").mock(
+        return_value=httpx.Response(503)
+    )
+    with pytest.raises(KardinalServerError):
+        Transport(api_key="test-key", max_retries=2).request("GET", "/plans/p1")
+    assert route.call_count == 3  # initial attempt + 2 retries
+
+
+@respx.mock
+def test_network_error_is_retried_then_raises_connection_error(monkeypatch) -> None:
+    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt: None)
+    route = respx.get(f"{DEFAULT_BASE_URL}/plans/p1").mock(
+        side_effect=httpx.ConnectError("refused")
+    )
+    with pytest.raises(Exception):
+        Transport(api_key="test-key", max_retries=1).request("GET", "/plans/p1")
+    assert route.call_count == 2  # initial attempt + 1 retry
+
+
+@respx.mock
+def test_2xx_response_with_non_json_body_raises_kardinal_error() -> None:
+    respx.get(f"{DEFAULT_BASE_URL}/plans/p1").mock(
+        return_value=httpx.Response(200, content=b"not json", headers={"content-type": "text/plain"})
+    )
+    with pytest.raises(KardinalError) as exc_info:
+        _transport().request("GET", "/plans/p1")
+    assert exc_info.value.code == "INVALID_RESPONSE_BODY"
+    assert exc_info.value.status == 200
+
+
+@respx.mock
+def test_204_response_returns_none() -> None:
+    respx.delete(f"{DEFAULT_BASE_URL}/plans/p1").mock(return_value=httpx.Response(204))
+    assert _transport().request("DELETE", "/plans/p1") is None
+
+
+@respx.mock
+def test_error_response_with_non_json_body_falls_back_to_empty_errors() -> None:
+    respx.get(f"{DEFAULT_BASE_URL}/plans/p1").mock(
+        return_value=httpx.Response(500, content=b"not json")
+    )
+    with pytest.raises(KardinalServerError) as exc_info:
+        _transport().request("GET", "/plans/p1")
+    assert exc_info.value.code == "INTERNAL_SERVER_ERROR"
+
+
+def test_close_is_idempotent_and_usable_as_a_context_manager() -> None:
+    with _transport() as transport:
+        assert transport._closed is False
+    assert transport._closed is True
+
+
+def test_request_after_close_raises_client_closed_error() -> None:
+    transport = _transport()
+    transport.close()
+    with pytest.raises(KardinalError) as exc_info:
+        transport.request("GET", "/plans/p1")
+    assert exc_info.value.code == "CLIENT_CLOSED"
