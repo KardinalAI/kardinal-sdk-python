@@ -116,12 +116,16 @@ class Transport:
                     attempt += 1
                     retry.sleep(attempt)
                     continue
+                # A connection that never opened didn't send anything: safe
+                # to retry even for a POST. Otherwise, a POST may have been
+                # processed and only its response lost.
+                never_sent = isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout))
                 raise KardinalConnectionError(
                     str(exc),
                     code="CONNECTION_ERROR",
                     status=0,
                     request_id=None,
-                    retryable=False,
+                    retryable=never_sent or method.upper() != "POST",
                 ) from exc
 
             if response.status_code < 300:
@@ -145,9 +149,9 @@ class Transport:
                 attempt += 1
                 retry.sleep(attempt)
                 continue
-            raise self._error_for(response)
+            raise self._error_for(response, method)
 
-    def _error_for(self, response: httpx.Response) -> KardinalError:
+    def _error_for(self, response: httpx.Response, method: str) -> KardinalError:
         request_id = response.headers.get("X-Request-Id")
         errors: list = []
         warnings: list = []
@@ -159,5 +163,9 @@ class Transport:
             except ValueError:
                 pass
         return from_response(
-            status=response.status_code, request_id=request_id, errors=errors, warnings=warnings
+            status=response.status_code,
+            request_id=request_id,
+            errors=errors,
+            warnings=warnings,
+            method=method,
         )

@@ -194,3 +194,23 @@ def test_details_is_none_without_an_error_envelope() -> None:
 def test_details_is_none_when_the_first_error_has_no_properties() -> None:
     exc = from_response(status=404, request_id=None, errors=_error("NOT_FOUND"))
     assert exc.details is None
+
+
+def test_a_5xx_on_post_is_not_retryable() -> None:
+    """The plan may have been created before the server failed: resubmitting
+    could create (and bill) it twice. `retryable` means "safe to retry".
+    """
+    exc = from_response(status=500, request_id=None, errors=[], method="POST")
+    assert isinstance(exc, KardinalServerError)
+    assert exc.retryable is False
+
+
+def test_a_5xx_on_get_put_delete_is_retryable() -> None:
+    for method in ("GET", "PUT", "DELETE"):
+        assert from_response(status=503, request_id=None, errors=[], method=method).retryable is True
+
+
+def test_a_429_is_retryable_even_on_post() -> None:
+    """The 429 comes from the cluster before any processing: nothing was created."""
+    exc = from_response(status=429, request_id=None, errors=[], method="POST")
+    assert exc.retryable is True

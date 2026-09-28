@@ -143,6 +143,9 @@ class KardinalOptimizationError(KardinalError):
 class KardinalConnectionError(KardinalError):
     """A network-level failure (DNS, connection refused, read timeout, ...)
     that never got an HTTP response at all, after retries were exhausted.
+    `retryable` unless the request was a POST that may have reached the
+    server: a connection that never opened is safe to retry, a response lost
+    after sending a POST isn't (the plan may exist).
     Client-side only, same as `KardinalTimeoutError` — without this, a
     `except KardinalError:` written to catch "anything that can go wrong
     talking to the API" would miss what's arguably the most common real
@@ -182,11 +185,17 @@ def from_response(
     request_id: Optional[str],
     errors: List[dict],
     warnings: Optional[List[dict]] = None,
+    method: str = "GET",
 ) -> KardinalError:
     """Build the right exception for a failed HTTP response.
 
     `errors` is the parsed `EnvelopedErrors.errors` list (empty for a 429,
     which carries no envelope at all). `warnings` is `EnvelopedErrors.warnings`.
+
+    `retryable` means "retrying is safe and may succeed": a 429 always (the
+    cluster refuses it before any processing), a 5xx except on POST, where
+    the plan may have been created before the server failed and a retry
+    could create it twice.
     """
     # A plan-size limit comes back as a 403 whose first error is the
     # INVALID_VALUE naming the field, followed by the error that explains
@@ -197,7 +206,7 @@ def from_response(
         primary = next((e for e in errors if e.get("code") not in _VALIDATION_CODES), primary)
     code = primary["code"] if primary else _synthetic_code(status)
     message = primary["message"] if primary else f"HTTP {status}"
-    retryable = status == 429 or status >= 500
+    retryable = status == 429 or (status >= 500 and method.upper() != "POST")
 
     if status == 403:
         family = KardinalLimitError

@@ -108,7 +108,7 @@ def test_network_failure_raises_connection_error_not_raw_httpx() -> None:
     with pytest.raises(KardinalConnectionError) as exc_info:
         _plans().get("p1")
     assert exc_info.value.code == "CONNECTION_ERROR"
-    assert exc_info.value.retryable is False
+    assert exc_info.value.retryable is True  # a GET is safe to retry
     assert isinstance(exc_info.value.__cause__, httpx.ConnectError)
 
 

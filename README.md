@@ -228,12 +228,15 @@ comes with an empty body and no `Retry-After` header. Reads, `update()`,
 `delete()`, `start()`, `stop()` and `wait()` retry it automatically;
 `submit()` doesn't, so retry it yourself after a pause.
 
-`.retryable` is computed by the SDK. An unrecognized `code` falls back to
-the family matching the HTTP status rather than disappearing, since the API
-may add new codes in a non-breaking release. `.warnings` is usually empty:
-it's populated when a rejected payload had already been amended (a value
-clamped, crow-fly distances forced, ...) before the error that rejected it
-was found.
+`.retryable` is computed by the SDK and means "retrying is safe and may
+succeed": true for a `429`, and for a `5xx` or a connection error, except
+when a `submit()` may have reached the server (the plan may then already
+exist: check with `list()` before submitting again). An unrecognized `code`
+falls back to the family matching the HTTP status rather than disappearing,
+since the API may add new codes in a non-breaking release. `.warnings` is
+usually empty: it's populated when a rejected payload had already been
+amended (a value clamped, crow-fly distances forced, ...) before the error
+that rejected it was found.
 
 ## Warnings
 

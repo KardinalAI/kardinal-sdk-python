@@ -2,7 +2,7 @@ import httpx
 import pytest
 import respx
 
-from kardinal._core.errors import KardinalError, KardinalServerError
+from kardinal._core.errors import KardinalConnectionError, KardinalError, KardinalServerError
 from kardinal._core.transport import DEFAULT_BASE_URL, Transport, resolve_base_url
 
 _ENV_VAR_URL = "https://api.example.com/v2"
@@ -138,3 +138,39 @@ def test_requests_identify_the_sdk_in_user_agent_and_x_kardinal_client() -> None
     assert headers["User-Agent"].startswith(f"{product} (Python/")
     assert f" httpx/{httpx.__version__}" in headers["User-Agent"]
     assert "cli;" not in headers["User-Agent"]
+
+
+@respx.mock
+def test_a_5xx_on_submit_is_raised_as_not_retryable() -> None:
+    route = respx.post(f"{DEFAULT_BASE_URL}/plans").mock(return_value=httpx.Response(500))
+    with pytest.raises(KardinalServerError) as info:
+        Transport(api_key="test-key").request("POST", "/plans", json={})
+    assert info.value.retryable is False
+    assert route.call_count == 1  # never retried automatically either
+
+
+@respx.mock
+def test_a_connection_that_never_opened_is_retryable_even_on_post() -> None:
+    """ConnectError/ConnectTimeout: the request never reached the server."""
+    respx.post(f"{DEFAULT_BASE_URL}/plans").mock(side_effect=httpx.ConnectTimeout("timed out"))
+    with pytest.raises(KardinalConnectionError) as info:
+        Transport(api_key="test-key").request("POST", "/plans", json={})
+    assert info.value.retryable is True
+
+
+@respx.mock
+def test_a_read_failure_on_post_is_not_retryable() -> None:
+    """The request may have been processed and only the response lost."""
+    respx.post(f"{DEFAULT_BASE_URL}/plans").mock(side_effect=httpx.ReadTimeout("timed out"))
+    with pytest.raises(KardinalConnectionError) as info:
+        Transport(api_key="test-key").request("POST", "/plans", json={})
+    assert info.value.retryable is False
+
+
+@respx.mock
+def test_a_read_failure_on_get_is_retryable(monkeypatch) -> None:
+    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt: None)
+    respx.get(f"{DEFAULT_BASE_URL}/plans").mock(side_effect=httpx.ReadTimeout("timed out"))
+    with pytest.raises(KardinalConnectionError) as info:
+        Transport(api_key="test-key").request("GET", "/plans")
+    assert info.value.retryable is True
