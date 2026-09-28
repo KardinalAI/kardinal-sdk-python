@@ -11,7 +11,7 @@ from typing import Literal, Optional
 import typer
 from pydantic import ValidationError
 
-from .._core.cli import Exit, emit, fail
+from .._core.cli import Exit, cli_client, emit, fail
 from .._core.errors import KardinalError
 
 routing = typer.Typer(help="Route optimization.")
@@ -22,13 +22,11 @@ routing.add_typer(solutions, name="solutions")
 
 
 def _client():
-    # Imported here, not at module level, so `--help` answers without
+    # cli_client() imports the client lazily, so `--help` answers without
     # loading the models or opening a connection. Used as a context manager
     # at every call site below so the CLI process doesn't leak the
     # underlying httpx connection pool past the command's lifetime.
-    from kardinal import Kardinal
-
-    return Kardinal()
+    return cli_client()
 
 
 @plans.command("submit")

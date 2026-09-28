@@ -81,7 +81,7 @@ def test_version_falls_back_when_package_is_not_installed(monkeypatch) -> None:
     def _raise(_name: str) -> None:
         raise PackageNotFoundError
 
-    monkeypatch.setattr("kardinal.cli._package_version", _raise)
+    monkeypatch.setattr("kardinal._core.transport._package_version", _raise)
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
     assert "unknown (not installed as a package)" in result.stdout
@@ -423,3 +423,27 @@ def test_routing_demo(monkeypatch) -> None:
     result = runner.invoke(app, ["routing", "demo", "--json"], env={"KARDINAL_API_KEY": "test-key"})
     assert result.exit_code == 0
     assert f"Submitted plan {_PLAN_ID}" in result.stderr
+
+
+@respx.mock
+def test_cli_requests_are_marked_cli_in_user_agent() -> None:
+    route = respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": []}})
+    )
+    result = runner.invoke(
+        app, ["routing", "plans", "get", _PLAN_ID, "--json"], env={"KARDINAL_API_KEY": "test-key"}
+    )
+    assert result.exit_code == 0
+    headers = route.calls.last.request.headers
+    assert headers["User-Agent"].startswith(f"kardinal-sdk-python/{version('kardinal-ai')} (cli; Python/")
+    assert headers["X-Kardinal-Client"] == f"kardinal-sdk-python/{version('kardinal-ai')}"
+
+
+@respx.mock
+def test_auth_check_requests_are_marked_cli_in_user_agent() -> None:
+    route = respx.get(f"{DEFAULT_BASE_URL}/plans").mock(
+        return_value=httpx.Response(200, json={"items": [], "paging": {"page": 1}, "agencyId": "a"})
+    )
+    result = runner.invoke(app, ["auth", "check", "--json"], env={"KARDINAL_API_KEY": "test-key"})
+    assert result.exit_code == 0
+    assert "(cli; " in route.calls.last.request.headers["User-Agent"]

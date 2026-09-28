@@ -21,6 +21,21 @@ class Exit(IntEnum):
     USAGE_ERROR = 2
 
 
+def cli_client():
+    """`Kardinal()` for a CLI command: same configuration (environment
+    variables), with `cli;` in the User-Agent so the backend can tell CLI
+    usage apart from library usage. Imported here, not at module level, so
+    `--help` answers without loading the client.
+    """
+    from kardinal import Kardinal
+
+    from .transport import user_agent
+
+    client = Kardinal()
+    client._transport._client.headers["User-Agent"] = user_agent(cli=True)
+    return client
+
+
 def emit(payload: Any, *, force_json: bool = False) -> None:
     """JSON when stdout isn't a terminal or `--json` was passed, a readable
     table otherwise — serves both a human and a script without a flag in the

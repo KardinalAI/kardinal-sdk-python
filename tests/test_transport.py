@@ -117,3 +117,24 @@ def test_request_after_close_raises_client_closed_error() -> None:
     with pytest.raises(KardinalError) as exc_info:
         transport.request("GET", "/plans/p1")
     assert exc_info.value.code == "CLIENT_CLOSED"
+
+
+def _installed_version() -> str:
+    from importlib.metadata import version
+
+    return version("kardinal-ai")
+
+
+@respx.mock
+def test_requests_identify_the_sdk_in_user_agent_and_x_kardinal_client() -> None:
+    """The backend can only tell SDK traffic (and its version) apart from any
+    other httpx client through these two headers.
+    """
+    route = respx.get(f"{DEFAULT_BASE_URL}/plans").mock(return_value=httpx.Response(200, json={}))
+    Transport(api_key="test-key").request("GET", "/plans")
+    headers = route.calls.last.request.headers
+    product = f"kardinal-sdk-python/{_installed_version()}"
+    assert headers["X-Kardinal-Client"] == product
+    assert headers["User-Agent"].startswith(f"{product} (Python/")
+    assert f" httpx/{httpx.__version__}" in headers["User-Agent"]
+    assert "cli;" not in headers["User-Agent"]

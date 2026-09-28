@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from importlib.metadata import PackageNotFoundError, version as _package_version
 from pathlib import Path
 
 import typer
 
-from ._core.cli import emit, fail
+from ._core.cli import cli_client, emit, fail
 from ._core.errors import KardinalError
+from ._core.transport import sdk_version
 from .routing.cli import routing
 
 app = typer.Typer(help="Kardinal CLI.", no_args_is_help=True)
@@ -18,9 +18,8 @@ app.add_typer(routing, name="routing")
 @app.command("version")
 def version() -> None:
     """Package version and the API version it targets."""
-    try:
-        package_version = _package_version("kardinal-ai")
-    except PackageNotFoundError:
+    package_version = sdk_version()
+    if package_version == "unknown":
         package_version = "unknown (not installed as a package)"
     typer.echo(f"kardinal {package_version} (API v2)")
 
@@ -35,10 +34,8 @@ def auth_check(json_out: bool = typer.Option(False, "--json")) -> None:
     works, and reports the host it was checked against and the agency
     (sandbox or production) it resolves to.
     """
-    from kardinal import Kardinal
-
     try:
-        with Kardinal() as client:
+        with cli_client() as client:
             response = client._transport.request(
                 "GET", "/plans", params={"page": 1, "itemsPerPage": 1, "archived": "excluded"}
             )

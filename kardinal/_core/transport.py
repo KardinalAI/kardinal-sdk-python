@@ -6,6 +6,8 @@ the `_core.errors` hierarchy.
 from __future__ import annotations
 
 import os
+import platform
+from importlib.metadata import PackageNotFoundError, version as _package_version
 from typing import Any, Dict, Optional
 
 import httpx
@@ -26,6 +28,31 @@ def resolve_base_url(base_url: Optional[str]) -> str:
     return base_url or os.environ.get(BASE_URL_ENV_VAR) or DEFAULT_BASE_URL
 
 
+def sdk_version() -> str:
+    """The installed `kardinal-ai` version, or `unknown` when the code runs
+    without being installed as a package.
+    """
+    try:
+        return _package_version("kardinal-ai")
+    except PackageNotFoundError:
+        return "unknown"
+
+
+def client_header() -> str:
+    """`X-Kardinal-Client`: short and stable, for the backend to filter on."""
+    return f"kardinal-sdk-python/{sdk_version()}"
+
+
+def user_agent(*, cli: bool = False) -> str:
+    """`User-Agent`: SDK name and version, then Python version, OS and
+    architecture (for diagnosis; nothing personal: no hostname, user or key),
+    then the HTTP library. `cli` marks calls made by the `kardinal` command.
+    """
+    details = ["cli"] if cli else []
+    details += [f"Python/{platform.python_version()}", f"{platform.system()}/{platform.machine()}"]
+    return f"{client_header()} ({'; '.join(details)}) httpx/{httpx.__version__}"
+
+
 class Transport:
     def __init__(
         self,
@@ -40,7 +67,11 @@ class Transport:
         self._client = httpx.Client(
             base_url=self.base_url,
             timeout=timeout,
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "User-Agent": user_agent(),
+                "X-Kardinal-Client": client_header(),
+            },
         )
         self._closed = False
 

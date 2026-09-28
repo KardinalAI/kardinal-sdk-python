@@ -286,6 +286,11 @@ never lands in shell history or the process list.
   earlier on its own once it stops finding improvements.
 - **In the sandbox, distances are crow-fly**: road routing is replaced, and
   each resource's `vehicleProfile` gets a warning saying so.
+- **The SDK identifies itself** in two headers on every request:
+  `User-Agent` (SDK version, Python version, OS and architecture, and the
+  `httpx` version, plus `cli` for calls made by the `kardinal` command) and
+  `X-Kardinal-Client` (SDK version). Nothing personal: no hostname, user or
+  key.
 - **`.request_id` is usually `None`**: it's only set when the server happens
   to send an `X-Request-Id` response header.
 - **`get_status()` returns a `PlanState`** (a single value), not the
