@@ -50,6 +50,11 @@ All methods hang off the client: `k = Kardinal()`.
 | `k.routing.solutions.get(plan_id)` | `GET /plans/{id}/solution` | Returns the current best solution right away, without waiting. |
 | `k.routing.solutions.get_objectives(plan_id)` | `GET /plans/{id}/solution/objectives` | Returns only the value of each objective, without the tours. |
 
+A `Page` has `items`, `page`, `total_pages`, `total`, `next_page` (`None`
+on the last page), `previous_page` (`None` on the first page) and
+`items_per_page`. Asking for a page past the last one returns the last page:
+`.page` gives the page actually returned.
+
 ### How `wait()` works
 
 - It polls `get_status()` every 10 seconds at first, stretching to every 60

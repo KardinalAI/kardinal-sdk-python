@@ -200,6 +200,8 @@ class PlansAPI:
             total_pages=paging["totalPages"],
             total=paging["total"],
             next_page=paging.get("nextPage"),
+            previous_page=paging.get("previousPage"),
+            items_per_page=paging.get("itemsPerPage"),
         )
 
     def iter_all(

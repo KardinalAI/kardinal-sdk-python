@@ -20,6 +20,9 @@ class Page(Generic[T]):
     total_pages: int
     total: int
     next_page: Optional[int]
+    # Absent on the first page (`next_page` is absent on the last one).
+    previous_page: Optional[int] = None
+    items_per_page: Optional[int] = None
 
 
 def iter_all(fetch_page: Callable[[int], "Page[T]"], *, start_page: int = 1) -> Iterator[T]:

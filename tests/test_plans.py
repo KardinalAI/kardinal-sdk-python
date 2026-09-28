@@ -53,6 +53,37 @@ def test_list_sends_pagination_params_and_parses_paging() -> None:
     assert sent_params["archived"] == "excluded"
     assert page.total == 1
     assert page.items[0].id == _PLAN_ID
+    assert page.next_page is None
+    assert page.previous_page is None  # absent on the first page
+    assert page.items_per_page == 20
+
+
+@respx.mock
+def test_list_parses_previous_and_next_page_on_a_middle_page() -> None:
+    """Shape observed live: a middle page carries both `nextPage` and
+    `previousPage`, and `itemsPerPage` echoes the requested page size.
+    """
+    respx.get(f"{DEFAULT_BASE_URL}/plans").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "items": [{"id": _PLAN_ID}],
+                "paging": {
+                    "total": 21,
+                    "totalPages": 5,
+                    "page": 2,
+                    "nextPage": 3,
+                    "previousPage": 1,
+                    "itemsPerPage": 5,
+                },
+            },
+        )
+    )
+    page = _plans().list(page=2, items_per_page=5)
+    assert (page.page, page.total_pages, page.total) == (2, 5, 21)
+    assert page.next_page == 3
+    assert page.previous_page == 1
+    assert page.items_per_page == 5
 
 
 @respx.mock
