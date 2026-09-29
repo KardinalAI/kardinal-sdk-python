@@ -2,7 +2,8 @@
 #
 # - A tag vX.Y.Z publishes to PyPI. Tags are created on the source
 #   repository and reach this one through a push mirror.
-# - "Run workflow" (workflow_dispatch) publishes a dry run to TestPyPI.
+# - "Run workflow" (workflow_dispatch) publishes a dry run to TestPyPI, as
+#   X.Y.Z.devN (N = run number): TestPyPI never accepts a version twice.
 #
 # Each publish job runs in a GitHub environment that requires a reviewer's
 # approval, so nothing is published without a human go-ahead.
@@ -31,6 +32,9 @@ jobs:
       - name: Check the tag matches the package version
         if: github.ref_type == 'tag'
         run: python scripts/check_tag_matches_version.py "$GITHUB_REF_NAME"
+      - name: Use a unique X.Y.Z.devN version for a TestPyPI dry run
+        if: github.event_name == 'workflow_dispatch'
+        run: python scripts/set_dev_version.py "$GITHUB_RUN_NUMBER"
       - name: Build
         run: python -m build
       - name: Check the distributions

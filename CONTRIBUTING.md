@@ -49,8 +49,17 @@ GitHub mirror, with Trusted Publishing: no API token is stored anywhere.
    publishes to https://pypi.org/project/kardinal-ai/.
 
 For a dry run, start the workflow by hand on GitHub (Actions → Publish →
-Run workflow): after approval in the `testpypi` environment, it publishes
-to https://test.pypi.org/project/kardinal-ai/ instead.
+Run workflow, on `main`): after approval in the `testpypi` environment, it
+publishes to https://test.pypi.org/project/kardinal-ai/ instead.
+
+TestPyPI, like PyPI, never accepts the same version twice. A dry run
+therefore publishes a pre-release, `X.Y.Z.devN`, N being the workflow run
+number (for instance `1.0.0.dev2`): `scripts/set_dev_version.py` sets it in
+the CI checkout only, so nothing is committed and every dry run gets its
+own version. To install one: `pip install --index-url
+https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/
+kardinal-ai==X.Y.Z.devN`. A real release (a `vX.Y.Z` tag) always publishes
+the version from `pyproject.toml` as is.
 
 ### The spec
 
