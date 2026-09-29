@@ -32,6 +32,26 @@ pytest -q
 CI runs `pytest -q` on every supported Python version (3.10 to 3.13, see
 `.gitlab-ci.yml`).
 
+### Releasing
+
+Releases are published to PyPI by `.github/workflows/publish.yml`, on the
+GitHub mirror, with Trusted Publishing: no API token is stored anywhere.
+
+1. Open a merge request that sets the new `version` in `pyproject.toml`,
+   and merge it.
+2. Create the tag `vX.Y.Z` (matching that version) on the source
+   repository, on the merged commit. The push mirror copies it to GitHub
+   within minutes. Don't create tags on GitHub: the mirror would overwrite
+   them.
+3. On GitHub, the workflow tests, checks that the tag matches the package
+   version, builds the sdist and the wheel, then waits in the `pypi`
+   environment for a reviewer's approval (Actions tab). Once approved, it
+   publishes to https://pypi.org/project/kardinal-ai/.
+
+For a dry run, start the workflow by hand on GitHub (Actions → Publish →
+Run workflow): after approval in the `testpypi` environment, it publishes
+to https://test.pypi.org/project/kardinal-ai/ instead.
+
 ### The spec
 
 `spec/openapi.yaml` is a copy of the `openapi.yaml` of the Kardinal API docs,
