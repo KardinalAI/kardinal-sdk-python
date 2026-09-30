@@ -27,10 +27,11 @@ pip install -e ".[dev]"
 
 bash scripts/generate_models.sh          # regenerate kardinal/routing/models/
 pytest -q
+mypy                                     # type check (config in pyproject.toml)
 ```
 
-CI runs `pytest -q` on every supported Python version (3.10 to 3.14, see
-`.gitlab-ci.yml`), then builds the sdist and the wheel and runs
+CI runs `pytest -q` and `mypy` on every supported Python version (3.10 to
+3.14, see `.gitlab-ci.yml`), then builds the sdist and the wheel and runs
 `twine check --strict` on them.
 
 ### Releasing

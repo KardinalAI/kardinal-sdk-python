@@ -44,6 +44,9 @@ dev = [
     # diff" check (tests/test_models_no_diff.py) fail nondeterministically depending
     # on which version pip happened to resolve on a given run.
     "datamodel-code-generator==0.45.0",
+    # Pinned exactly, like the code generator: a new mypy release can report
+    # new errors on unchanged code and fail CI on its own.
+    "mypy==2.3.1",
     "pytest>=8.0",
     # scripts/check_spec_matches_mintlify.sh parses both specs.
     "pyyaml>=6.0",
@@ -56,3 +59,12 @@ kardinal = "kardinal.cli:app"
 
 [tool.setuptools.packages.find]
 include = ["kardinal*"]
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+files = ["kardinal"]
+
+# Generated from spec/openapi.yaml: never hand-edited, so not type-checked.
+[[tool.mypy.overrides]]
+module = "kardinal.routing.models"
+ignore_errors = true

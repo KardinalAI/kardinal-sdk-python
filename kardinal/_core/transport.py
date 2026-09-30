@@ -90,9 +90,9 @@ class Transport:
         method: str,
         path: str,
         *,
-        json: Optional[Dict[str, Any]] = None,
+        json: Any = None,
         params: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Any:
         """Send one request, retrying per `_core.retry`'s policy, and raise a
         `KardinalError` subclass on a failed response.
         """

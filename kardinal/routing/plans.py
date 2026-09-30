@@ -5,7 +5,7 @@ the single generated `Plan` schema can't provide on its own.
 
 from __future__ import annotations
 
-from typing import Dict, Iterator, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict
 
@@ -109,8 +109,9 @@ class Plan(models.Plan):
 
     model_config = ConfigDict(extra="allow")
 
-    id: str
-    orders: Optional[List[PlanOrder]] = None
+    # Narrowing the generated fields, on purpose (see above).
+    id: str  # type: ignore[assignment]
+    orders: Optional[List[PlanOrder]] = None  # type: ignore[assignment]
     warnings: List[models.Warning] = []
 
 
@@ -138,7 +139,7 @@ _PLAN_READ_ONLY_FIELDS = frozenset(
 )
 
 
-def _plan_from_envelope(response: Dict[str, object]) -> Plan:
+def _plan_from_envelope(response: Dict[str, Any]) -> Plan:
     """`EnvelopedPlan.item`, plus `EnvelopedPlan.warnings` copied onto the
     returned `Plan` — `warnings` is a sibling of `item` in the response
     body, not a field `Plan.model_validate(item)` would ever see on its own.
@@ -183,7 +184,7 @@ class PlansAPI:
         """
         # `warnings` is this SDK's own field (see `Plan`), not the plan's.
         body = plan.model_dump(
-            mode="json", exclude_none=True, exclude=_PLAN_READ_ONLY_FIELDS | {"warnings"}
+            mode="json", exclude_none=True, exclude=set(_PLAN_READ_ONLY_FIELDS | {"warnings"})
         )
         response = self._transport.request(
             "PUT", f"/plans/{plan.id}", json=body, params={"force": force}

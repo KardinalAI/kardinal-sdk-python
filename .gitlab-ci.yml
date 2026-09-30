@@ -19,6 +19,9 @@ test:
     # model regeneration check (test_models_no_diff), test_no_extra_allow and
     # test_error_hierarchy.
     - pytest -q
+    # Static type check, the counterpart of the TypeScript SDK's tsc --noEmit
+    # (configuration in pyproject.toml).
+    - mypy
     # The sdist and the wheel build, and their metadata (the README included)
     # render on PyPI: what the publish workflow checks, caught before a tag.
     - pip install -q build twine

@@ -26,7 +26,7 @@ carries no envelope.
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, Type
 
 
 class KardinalError(Exception):
@@ -209,6 +209,7 @@ def from_response(
     message = (primary.get("message") if primary else None) or f"HTTP {status}"
     retryable = status == 429 or (status >= 500 and method.upper() != "POST")
 
+    family: Type[KardinalError]
     if status == 403:
         family = KardinalLimitError
     elif code in _AUTH_CODES:

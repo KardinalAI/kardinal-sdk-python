@@ -67,7 +67,7 @@ def _patch_broken_plan_id() -> bool:
         for field_name in ("id", "planId"):
             field = cls.model_fields.get(field_name)
             if field is not None and field.annotation == broken:
-                field.annotation = fixed
+                field.annotation = fixed  # type: ignore[assignment]
                 changed = True
         if changed:
             cls.model_rebuild(force=True)
@@ -114,24 +114,25 @@ def _patch_scalar_root_equality() -> bool:
         ):
             continue
 
-        def _eq(self, other: object, _cls: type = cls) -> bool:
+        def _eq(self: Any, other: object, _cls: type = cls) -> bool:
             if isinstance(other, _cls):
-                return self.root == other.root
-            return self.root == other
+                return bool(self.root == other.root)  # type: ignore[attr-defined]
+            return bool(self.root == other)
 
-        def _hash(self: object) -> int:
-            return hash(self.root)  # type: ignore[attr-defined]
+        def _hash(self: Any) -> int:
+            return hash(self.root)
 
-        def _str(self: object) -> str:
-            return str(self.root)  # type: ignore[attr-defined]
+        def _str(self: Any) -> str:
+            return str(self.root)
 
-        def _format(self: object, format_spec: str) -> str:
-            return format(self.root, format_spec)  # type: ignore[attr-defined]
+        def _format(self: Any, format_spec: str) -> str:
+            return format(self.root, format_spec)
 
-        cls.__eq__ = _eq
-        cls.__hash__ = _hash
-        cls.__str__ = _str
-        cls.__format__ = _format
+        # setattr: these replace methods on a class generated elsewhere.
+        setattr(cls, "__eq__", _eq)
+        setattr(cls, "__hash__", _hash)
+        setattr(cls, "__str__", _str)
+        setattr(cls, "__format__", _format)
         patched_any = True
     return patched_any
 
