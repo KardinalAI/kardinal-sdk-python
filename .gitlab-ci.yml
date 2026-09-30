@@ -8,7 +8,7 @@ test:
   image: python:$PYTHON_VERSION
   parallel:
     matrix:
-      - PYTHON_VERSION: ["3.10", "3.11", "3.12", "3.13"]
+      - PYTHON_VERSION: ["3.10", "3.11", "3.12", "3.13", "3.14"]
   before_script:
     - python -m venv .venv
     - source .venv/bin/activate
@@ -19,3 +19,8 @@ test:
     # model regeneration check (test_models_no_diff), test_no_extra_allow and
     # test_error_hierarchy.
     - pytest -q
+    # The sdist and the wheel build, and their metadata (the README included)
+    # render on PyPI: what the publish workflow checks, caught before a tag.
+    - pip install -q build twine
+    - python -m build --outdir dist/ >/dev/null
+    - twine check --strict dist/*

@@ -29,8 +29,9 @@ bash scripts/generate_models.sh          # regenerate kardinal/routing/models/
 pytest -q
 ```
 
-CI runs `pytest -q` on every supported Python version (3.10 to 3.13, see
-`.gitlab-ci.yml`).
+CI runs `pytest -q` on every supported Python version (3.10 to 3.14, see
+`.gitlab-ci.yml`), then builds the sdist and the wheel and runs
+`twine check --strict` on them.
 
 ### Releasing
 
