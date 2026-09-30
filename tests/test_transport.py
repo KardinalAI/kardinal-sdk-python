@@ -174,3 +174,15 @@ def test_a_read_failure_on_get_is_retryable(monkeypatch) -> None:
     with pytest.raises(KardinalConnectionError) as info:
         Transport(api_key="test-key").request("GET", "/plans")
     assert info.value.retryable is True
+
+
+@respx.mock
+@pytest.mark.parametrize("body", [b"null", b"[1, 2]", b'"oops"'])
+def test_error_response_whose_json_body_is_not_an_object_falls_back_to_empty_errors(body) -> None:
+    respx.get(f"{DEFAULT_BASE_URL}/plans/p1").mock(
+        return_value=httpx.Response(500, content=body)
+    )
+    with pytest.raises(KardinalServerError) as exc_info:
+        _transport().request("GET", "/plans/p1")
+    assert exc_info.value.code == "INTERNAL_SERVER_ERROR"
+    assert exc_info.value.errors == []

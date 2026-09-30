@@ -39,7 +39,7 @@ All methods hang off the client: `k = Kardinal()`.
 |---|---|---|
 | `k.routing.plans.submit(plan)` | `POST /plans` | Creates a plan from a `PlanCreate` (no `id`: the server assigns it) and starts its optimization. Consumes credits. Returns the `Plan`, with `.warnings`. |
 | `k.routing.plans.get(plan_id)` | `GET /plans/{id}` | Returns the plan as currently stored. |
-| `k.routing.plans.update(plan, force=False)` | `PUT /plans/{id}` | Replaces the whole plan (anything left out is removed). The version increments, and the plan is re-optimized, only if the plan actually changed; an identical update is a free no-op. `force=True` unarchives an archived plan first. |
+| `k.routing.plans.update(plan, force=False)` | `PUT /plans/{id}` | Replaces the whole plan (anything left out is removed; fields this SDK version doesn't know, read by `get()`, are kept and sent back). The version increments, and the plan is re-optimized, only if the plan actually changed; an identical update is a free no-op. `force=True` unarchives an archived plan first. |
 | `k.routing.plans.delete(plan_id)` | `DELETE /plans/{id}` | Permanently deletes the plan and its solution; any optimization in progress is stopped. |
 | `k.routing.plans.list(page=1, items_per_page=20, archived="excluded")` | `GET /plans` | Returns one `Page` of plans, in their light form (`PlanLight`). |
 | `k.routing.plans.iter_all(archived="excluded")` | `GET /plans`, every page | Iterates over every plan. |

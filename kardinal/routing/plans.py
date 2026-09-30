@@ -70,16 +70,24 @@ class PlanCreate(BaseModel):
     CO2EmissionCalculationByResourceTag: Optional[Dict[str, models.Cost]] = None
 
 
+class PlanOrder(Order):
+    """`Order` as read back in a `Plan` from the server: same fields, but
+    unknown ones are kept instead of rejected (see `Plan` below).
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+
 class Plan(models.Plan):
     """The generated `Plan`, with three overrides:
 
     - `id` is narrowed to required: every `Plan` this SDK hands back came
       from the server and always has one. Forgetting it on `update()` fails
       at the type-checking stage, not at the server.
-    - `orders` is retyped to this module's `Order` (see above) instead of
-      the generated one, so a `Plan` fetched with `get()` and a `PlanCreate`
-      built by hand use the same `stops` shape — `plan.orders.append(Order(...))`
-      ahead of `update()` doesn't mix two different `Order` classes.
+    - `orders` is retyped to `PlanOrder`, a subclass of this module's
+      `Order` (see above), instead of the generated one, so a `Plan` fetched
+      with `get()` and a `PlanCreate` built by hand use the same `stops`
+      shape — `plan.orders.append(Order(...))` ahead of `update()` works.
     - `warnings` doesn't exist on the generated `Plan` at all: it's a sibling
       of `item` on the `EnvelopedPlan` envelope, not a field of the plan
       itself. `submit`/`get`/`update` below copy it across after validating
@@ -88,15 +96,20 @@ class Plan(models.Plan):
       envelope type to unwrap.
 
     Unlike `Order`/`PlanCreate` (pure request types, `extra="forbid"`),
-    `Plan` stays `extra="ignore"` (the generated default) on purpose: it's
-    also the type `get()`/`submit()`/`update()` deserialize the server's
-    *response* into. Forbidding unknown fields here would make this SDK
-    fail to parse a legitimate response the day the API adds a field this
-    version of the SDK doesn't know about yet, rather than just ignoring it.
+    `Plan` and `PlanOrder` are `extra="allow"` on purpose: they're also the
+    types `get()`/`submit()`/`update()` deserialize the server's *response*
+    into. Forbidding unknown fields would make this SDK fail to parse a
+    legitimate response the day the API adds a field this version of the
+    SDK doesn't know about yet; ignoring them would make `update()`, which
+    replaces the whole plan, delete that field on the server. Kept, they're
+    sent back unchanged. Nested generated models (resources, stops) still
+    drop unknown fields.
     """
 
+    model_config = ConfigDict(extra="allow")
+
     id: str
-    orders: Optional[List[Order]] = None
+    orders: Optional[List[PlanOrder]] = None
     warnings: List[models.Warning] = []
 
 
@@ -162,8 +175,9 @@ class PlansAPI:
 
         `force` unarchives the plan first if it's archived; ignored otherwise.
         """
+        # `warnings` is this SDK's own field (see `Plan`), not the plan's.
         body = plan.model_dump(
-            mode="json", exclude_none=True, exclude=_PLAN_READ_ONLY_FIELDS
+            mode="json", exclude_none=True, exclude=_PLAN_READ_ONLY_FIELDS | {"warnings"}
         )
         response = self._transport.request(
             "PUT", f"/plans/{plan.id}", json=body, params={"force": force}
@@ -235,22 +249,27 @@ class PlansAPI:
         )
         return models.EnvelopedPlanReference.model_validate(response)
 
-    def get_status(self, plan_id: str) -> models.PlanState:
+    def get_status(self, plan_id: str) -> Union[models.PlanState, str]:
         """`GET /plans/{id}/state`. Returns the plan's current `PlanState`
-        (`waiting`, `processing`, ..., `optimized`, `stopped`, ...).
+        (`waiting`, `processing`, ..., `optimized`, `stopped`, ...), or the
+        raw string for a state this version of the SDK doesn't know yet.
 
         The type returned is `PlanState` (the enum this endpoint's `state`
         field actually carries), not the unrelated `PlanStatus` object
         embedded in `Plan.status` — the spec uses both names for different
-        things (see the README's "known gaps" section).
+        things (see the README's "Good to know" section).
         """
         return self._get_state(plan_id)[0]
 
-    def _get_state(self, plan_id: str) -> Tuple[models.PlanState, Optional[int]]:
+    def _get_state(self, plan_id: str) -> Tuple[Union[models.PlanState, str], Optional[int]]:
         """`get_status()` plus the `planVersion` that state belongs to —
         `solutions.wait()` needs both, since right after `update()` this
         endpoint can still report the previous version's state.
         """
         response = self._transport.request("GET", f"/plans/{plan_id}/state")
         item = response["item"]
-        return models.PlanState(item["state"]), item.get("planVersion")
+        try:
+            state: Union[models.PlanState, str] = models.PlanState(item["state"])
+        except ValueError:
+            state = item["state"]
+        return state, item.get("planVersion")

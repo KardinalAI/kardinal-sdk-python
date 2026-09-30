@@ -158,10 +158,11 @@ class Transport:
         if response.content:
             try:
                 body = response.json()
+            except ValueError:
+                body = None
+            if isinstance(body, dict):
                 errors = body.get("errors") or []
                 warnings = body.get("warnings") or []
-            except ValueError:
-                pass
         return from_response(
             status=response.status_code,
             request_id=request_id,

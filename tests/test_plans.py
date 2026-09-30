@@ -7,7 +7,7 @@ import respx
 from kardinal._core.errors import KardinalConnectionError, KardinalNotFoundError
 from kardinal._core.transport import DEFAULT_BASE_URL, Transport
 from kardinal.routing import models
-from kardinal.routing.plans import Plan, PlanCreate, PlansAPI
+from kardinal.routing.plans import Order, Plan, PlanCreate, PlansAPI
 
 _PLAN_ID = "4cbd0ab8-282c-4b30-b981-29e1ed8a2016"
 
@@ -234,3 +234,83 @@ def test_list_with_archived_only() -> None:
     )
     _plans().list(archived="only")
     assert route.calls.last.request.url.params["archived"] == "only"
+
+
+_STOP = {
+    "type": "single",
+    "id": "s1",
+    "position": {"lat": 48.85, "lon": 2.35},
+    "duration": "PT5M",
+}
+
+
+@respx.mock
+def test_update_does_not_send_warnings_back() -> None:
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={
+            "item": {"id": _PLAN_ID, "resources": []},
+            "warnings": [{"code": "INVALID_VALUE", "message": "Traffic turned off."}],
+        })
+    )
+    route = respx.put(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": []}})
+    )
+    plans = _plans()
+    plan = plans.get(_PLAN_ID)
+    assert plan.warnings
+    plans.update(plan)
+    assert "warnings" not in json.loads(route.calls.last.request.content)
+
+
+@respx.mock
+def test_get_then_update_keeps_fields_this_sdk_does_not_know() -> None:
+    # PUT replaces the whole plan: a field the server added after this SDK
+    # version must survive a get() -> update() round trip, on the plan and
+    # on its orders, or the update would silently delete it.
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {
+            "id": _PLAN_ID,
+            "resources": [],
+            "futurePlanField": {"a": 1},
+            "orders": [{"id": "o1", "stops": [_STOP], "futureOrderField": True}],
+        }})
+    )
+    route = respx.put(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": []}})
+    )
+    plans = _plans()
+    plans.update(plans.get(_PLAN_ID))
+    sent = json.loads(route.calls.last.request.content)
+    assert sent["futurePlanField"] == {"a": 1}
+    assert sent["orders"][0]["futureOrderField"] is True
+
+
+@respx.mock
+def test_an_order_appended_to_a_fetched_plan_is_sent() -> None:
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {
+            "id": _PLAN_ID, "resources": [], "orders": [{"id": "o1", "stops": [_STOP]}],
+        }})
+    )
+    route = respx.put(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": []}})
+    )
+    plans = _plans()
+    plan = plans.get(_PLAN_ID)
+    plan.orders.append(Order(id="o2", stops=[models.SingleStop.model_validate(_STOP)]))
+    plans.update(plan)
+    sent = json.loads(route.calls.last.request.content)
+    assert [o["id"] for o in sent["orders"]] == ["o1", "o2"]
+
+
+def test_a_hand_built_order_still_rejects_unknown_fields() -> None:
+    with pytest.raises(ValueError):
+        Order(id="o1", stops=[], typo=True)
+
+
+@respx.mock
+def test_get_status_passes_an_unknown_state_through() -> None:
+    respx.get(f"{DEFAULT_BASE_URL}/plans/p1/state").mock(
+        return_value=httpx.Response(200, json={"item": {"state": "someFutureState"}})
+    )
+    assert _plans().get_status("p1") == "someFutureState"

@@ -60,7 +60,7 @@ class SolutionObjectives(List[models.SolutionObjective]):
     from the `EnvelopedSolutionObjectives` envelope — a list subclass so
     every existing use (`for o in ...`, indexing, `len()`) keeps working
     unchanged; there's no `SolutionObjectives` schema in openapi.yaml to
-    model this as a `BaseModel` instead (see the README's "known gaps").
+    model this as a `BaseModel` instead.
     """
 
     warnings: List[models.Warning]

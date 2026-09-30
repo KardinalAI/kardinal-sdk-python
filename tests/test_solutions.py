@@ -392,3 +392,13 @@ def test_get_objectives_copies_envelope_warnings() -> None:
     _, solutions = _apis()
     objectives = solutions.get_objectives(_PLAN_ID)
     assert objectives.warnings[0].code.value == "INVALID_VALUE"
+
+
+@respx.mock
+def test_wait_keeps_polling_through_a_state_this_sdk_does_not_know(clock) -> None:
+    _mock_plan()
+    _mock_states(clock, [(0, "someFutureState", 1), (30, "optimized", 1)])
+    _mock_solution()
+    plans, solutions = _apis()
+    solution = solutions.wait(_PLAN_ID, timeout=600)
+    assert solution.final_state == PlanState.optimized

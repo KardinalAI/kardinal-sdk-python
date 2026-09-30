@@ -214,3 +214,10 @@ def test_a_429_is_retryable_even_on_post() -> None:
     """The 429 comes from the cluster before any processing: nothing was created."""
     exc = from_response(status=429, request_id=None, errors=[], method="POST")
     assert exc.retryable is True
+
+
+def test_an_error_entry_without_code_or_message_falls_back_to_synthetic_values() -> None:
+    exc = from_response(status=404, request_id=None, errors=[{"properties": {}}])
+    assert isinstance(exc, KardinalNotFoundError)
+    assert exc.code == "NOT_FOUND"
+    assert str(exc) == "HTTP 404"

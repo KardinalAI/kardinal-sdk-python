@@ -204,8 +204,8 @@ def from_response(
     primary = errors[0] if errors else None
     if status == 403:
         primary = next((e for e in errors if e.get("code") not in _VALIDATION_CODES), primary)
-    code = primary["code"] if primary else _synthetic_code(status)
-    message = primary["message"] if primary else f"HTTP {status}"
+    code = (primary.get("code") if primary else None) or _synthetic_code(status)
+    message = (primary.get("message") if primary else None) or f"HTTP {status}"
     retryable = status == 429 or (status >= 500 and method.upper() != "POST")
 
     if status == 403:
