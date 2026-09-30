@@ -365,6 +365,18 @@ def test_plans_status() -> None:
 
 
 @respx.mock
+def test_plans_status_prints_a_state_this_sdk_does_not_know() -> None:
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}/state").mock(
+        return_value=httpx.Response(200, json={"item": {"state": "someFutureState"}})
+    )
+    result = runner.invoke(
+        app, ["routing", "plans", "status", _PLAN_ID, "--json"], env={"KARDINAL_API_KEY": "test-key"}
+    )
+    assert result.exit_code == 0
+    assert json.loads(result.stdout) == {"state": "someFutureState"}
+
+
+@respx.mock
 def test_solutions_get_objectives_and_wait() -> None:
     respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}/solution").mock(
         return_value=httpx.Response(200, json={"item": {}})
