@@ -32,9 +32,12 @@ Source = "https://github.com/KardinalAI/kardinal-sdk-python"
 Issues = "https://github.com/KardinalAI/kardinal-sdk-python/issues"
 
 [project.optional-dependencies]
-cli = ["typer>=0.12"]
+# typer 0.19 and click 8.2 are the oldest versions the CLI tests pass on
+# (click 8.2: no arguments at all is a usage error, exit code 2).
+cli = ["typer>=0.19", "click>=8.2"]
 dev = [
-    "typer>=0.12",
+    "typer>=0.19",
+    "click>=8.2",
     # Pinned exactly, not >=: different datamodel-code-generator versions
     # decide differently which models need an explicit model_rebuild() call,
     # so an unpinned version here made the CI "models regenerate with no
@@ -42,6 +45,8 @@ dev = [
     # on which version pip happened to resolve on a given run.
     "datamodel-code-generator==0.45.0",
     "pytest>=8.0",
+    # scripts/check_spec_matches_mintlify.sh parses both specs.
+    "pyyaml>=6.0",
     "pytest-cov>=5.0",
     "respx>=0.21",
 ]

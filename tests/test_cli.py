@@ -4,6 +4,7 @@ import sys
 from importlib.metadata import PackageNotFoundError, version
 
 import httpx
+import pytest
 import respx
 from typer.testing import CliRunner
 
@@ -459,3 +460,76 @@ def test_auth_check_requests_are_marked_cli_in_user_agent() -> None:
     result = runner.invoke(app, ["auth", "check", "--json"], env={"KARDINAL_API_KEY": "test-key"})
     assert result.exit_code == 0
     assert "(cli; " in route.calls.last.request.headers["User-Agent"]
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        [],
+        ["routing"],
+        ["bogus"],
+        ["routing", "plans", "list", "--archived", "bogus"],
+        ["routing", "plans", "list", "--page", "abc"],
+        ["routing", "plans", "submit", "/nonexistent.json"],
+        ["routing", "solutions", "wait", _PLAN_ID, "--timeout", "soon"],
+    ],
+)
+def test_usage_errors_exit_with_code_2(args) -> None:
+    assert runner.invoke(app, args, env={"KARDINAL_API_KEY": "test-key"}).exit_code == 2
+
+
+def test_help_exits_with_code_0() -> None:
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "routing" in result.stdout
+
+
+def test_validate_reports_invalid_json_as_a_field_error(tmp_path) -> None:
+    bad = tmp_path / "bad.json"
+    bad.write_text("{bad")
+    result = runner.invoke(app, ["routing", "plans", "validate", str(bad)])
+    assert result.exit_code == 1
+    [issue] = json.loads(result.stdout)
+    assert issue["field"] == ""
+    assert issue["error"].startswith("Invalid JSON: ")
+
+
+@respx.mock
+def test_plans_list_sends_the_page_and_archived_options() -> None:
+    route = respx.get(f"{DEFAULT_BASE_URL}/plans").mock(
+        return_value=httpx.Response(
+            200, json={"items": [{"id": _PLAN_ID}], "paging": {"total": 1, "totalPages": 1, "page": 2}}
+        )
+    )
+    result = runner.invoke(
+        app,
+        ["routing", "plans", "list", "--page", "2", "--archived", "only", "--json"],
+        env={"KARDINAL_API_KEY": "test-key"},
+    )
+    assert result.exit_code == 0
+    params = route.calls.last.request.url.params
+    assert params["page"] == "2"
+    assert params["archived"] == "only"
+
+
+@respx.mock
+def test_solutions_wait_takes_a_timeout_in_seconds_and_prints_final_state(monkeypatch) -> None:
+    monkeypatch.setattr("time.sleep", lambda _seconds: None)
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": []}})
+    )
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}/state").mock(
+        return_value=httpx.Response(200, json={"item": {"state": "optimized"}})
+    )
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}/solution").mock(
+        return_value=httpx.Response(200, json={"item": {}})
+    )
+    result = runner.invoke(
+        app,
+        ["routing", "solutions", "wait", _PLAN_ID, "--timeout", "600", "--json"],
+        env={"KARDINAL_API_KEY": "test-key"},
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["finalState"] == "optimized"
+    assert "final_state" not in payload

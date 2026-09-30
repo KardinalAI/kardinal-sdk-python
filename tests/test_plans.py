@@ -314,3 +314,34 @@ def test_get_status_passes_an_unknown_state_through() -> None:
         return_value=httpx.Response(200, json={"item": {"state": "someFutureState"}})
     )
     assert _plans().get_status("p1") == "someFutureState"
+
+
+@respx.mock
+def test_responses_with_enum_values_this_sdk_does_not_know_still_parse() -> None:
+    # The API may add a plan state or a warning code in a non-breaking
+    # release: submit() must not fail after the plan was created and billed.
+    respx.post(f"{DEFAULT_BASE_URL}/plans").mock(
+        return_value=httpx.Response(201, json={
+            "item": {"id": _PLAN_ID, "resources": [], "state": "someFutureState"},
+            "warnings": [{"code": "SOME_FUTURE_CODE", "message": "m"}],
+        })
+    )
+    respx.get(f"{DEFAULT_BASE_URL}/plans").mock(
+        return_value=httpx.Response(200, json={
+            "items": [{"id": _PLAN_ID, "state": "someFutureState"}],
+            "paging": {"total": 1, "totalPages": 1, "page": 1},
+        })
+    )
+    plans = _plans()
+    plan = plans.submit(PlanCreate(resources=[]))
+    assert plan.state.root.value == "someFutureState"
+    assert plan.warnings[0].code.value == "SOME_FUTURE_CODE"
+    assert plans.list().items[0].state.root.value == "someFutureState"
+
+
+def test_a_hand_built_plan_still_rejects_an_unknown_enum_value() -> None:
+    with pytest.raises(ValueError):
+        PlanCreate.model_validate({
+            "resources": [],
+            "orders": [{"id": "o1", "stops": [{**_STOP, "kind": "someFutureKind"}]}],
+        })

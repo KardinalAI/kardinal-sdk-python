@@ -161,8 +161,8 @@ class Transport:
             except ValueError:
                 body = None
             if isinstance(body, dict):
-                errors = body.get("errors") or []
-                warnings = body.get("warnings") or []
+                errors = _objects(body.get("errors"))
+                warnings = _objects(body.get("warnings"))
         return from_response(
             status=response.status_code,
             request_id=request_id,
@@ -170,3 +170,11 @@ class Transport:
             warnings=warnings,
             method=method,
         )
+
+
+def _objects(value: Any) -> list:
+    """The error (or warning) objects of an error body, ignoring anything
+    that isn't a list of objects: a malformed body must not hide the
+    HTTP error behind a crash."""
+    return [entry for entry in value if isinstance(entry, dict)] if isinstance(value, list) else []
+

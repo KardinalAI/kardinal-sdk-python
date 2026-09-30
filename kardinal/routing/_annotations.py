@@ -22,9 +22,13 @@ in favor of `--help` staying fast and connection-free.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from enum import Enum
-from typing import Optional
+from typing import Any, Iterator, Optional, Type, TypeVar
 from uuid import UUID
+
+from pydantic import BaseModel
 
 from . import models
 
@@ -41,7 +45,7 @@ def _patch_broken_plan_id() -> bool:
 
     Point those fields at a plain string instead and rebuild the affected
     models. This is a codegen defect on a double-`allOf` chain in the spec,
-    not fixed there this pass — see the README's "known gaps" section.
+    not fixed there this pass.
 
     Returns whether anything was patched. Deliberately not an `assert`: if
     the spec is ever fixed upstream so `PlanId` parses correctly on its own,
@@ -133,3 +137,59 @@ def _patch_scalar_root_equality() -> bool:
 
 
 SCALAR_ROOT_EQUALITY_PATCH_APPLIED = _patch_scalar_root_equality()
+
+
+# Set while parsing a response from the server, never while validating what
+# a user builds (see `validate_response` below).
+_LENIENT_ENUMS: ContextVar[bool] = ContextVar("kardinal_lenient_enums", default=False)
+
+
+def _lenient_missing(cls: Type[Enum], value: object) -> Optional[Enum]:
+    """`Enum._missing_`: in a server response, a value this SDK version
+    doesn't know becomes a pseudo-member carrying it (`.value` is the raw
+    string), instead of failing the whole response."""
+    if not (_LENIENT_ENUMS.get() and isinstance(value, str)):
+        return None
+    member = object.__new__(cls)
+    member._value_ = value
+    member._name_ = value
+    return member
+
+
+def _patch_lenient_enums() -> bool:
+    """The API may add a value to any enum in a non-breaking release (a new
+    plan state, warning code, ...): openapi.yaml says so for codes. Strict
+    enum validation would make `get()`, `list()`, `submit()` ... fail on a
+    legitimate response with a `pydantic.ValidationError` the day that
+    happens — after `submit()` already created and billed the plan. The
+    TypeScript SDK passes such values through; so does this, but only for
+    responses: a plan built by hand is still validated strictly.
+    """
+    patched_any = False
+    for name in dir(models):
+        cls = getattr(models, name)
+        if isinstance(cls, type) and issubclass(cls, Enum) and cls is not Enum:
+            cls._missing_ = classmethod(_lenient_missing)  # type: ignore[assignment]
+            patched_any = True
+    return patched_any
+
+
+LENIENT_ENUMS_PATCH_APPLIED = _patch_lenient_enums()
+
+_M = TypeVar("_M", bound=BaseModel)
+
+
+@contextmanager
+def _lenient_enums() -> Iterator[None]:
+    token = _LENIENT_ENUMS.set(True)
+    try:
+        yield
+    finally:
+        _LENIENT_ENUMS.reset(token)
+
+
+def validate_response(model: Type[_M], data: Any) -> _M:
+    """`model.model_validate(data)` for data the server sent: enum values
+    this SDK version doesn't know are kept instead of rejected."""
+    with _lenient_enums():
+        return model.model_validate(data)

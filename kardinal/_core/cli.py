@@ -49,7 +49,8 @@ def emit(payload: Any, *, force_json: bool = False) -> None:
         for row in payload if isinstance(payload, list) else [payload]:
             if isinstance(row, dict):
                 for key, value in row.items():
-                    typer.echo(f"{key:<24} {value}")
+                    shown = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+                    typer.echo(f"{key:<24} {shown}")
                 typer.echo("")
             else:
                 typer.echo(str(row))

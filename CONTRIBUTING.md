@@ -118,6 +118,27 @@ after every regeneration.
   trade-off).
 - The webhook endpoints are marked `x-excluded` in the spec and are not
   implemented by this SDK.
+- Enum values this SDK version doesn't know (a new plan state, warning
+  code, ...) are kept when parsing a response, never when validating a plan
+  built by hand: `validate_response()` in `kardinal/routing/_annotations.py`.
+
+### Differences with the TypeScript SDK
+
+The two SDKs behave the same; what differs, on purpose or by the nature of
+each stack:
+
+- Local validation: the TypeScript SDK validates `orders`, `stops`,
+  `resources` and the top-level fields with the same rules, but not the
+  inside of the rarer nested objects (`cost`, `breaks`, `objectives`,
+  constraints, ...), and it keeps unknown fields there. pydantic, here,
+  also accepts strings for numbers and booleans (`"1"`, `"true"`), which
+  Zod rejects.
+- Timeout: `httpx` applies `timeout` to each phase of a request; the
+  TypeScript SDK's `timeoutMs` covers the whole request, response included.
+- Validation messages (`plans validate`): the wording of pattern, missing
+  field and unknown field errors is shared; other messages come from
+  pydantic here and from Zod there.
+- Pre-releases: TestPyPI here, the npm `next` dist-tag there.
 
 ### What we don't want
 

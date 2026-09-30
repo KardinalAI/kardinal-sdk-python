@@ -242,3 +242,16 @@ def test_content_type_is_sent_only_with_a_body() -> None:
     _transport().request("POST", "/plans", json={})
     assert "Content-Type" not in get.calls.last.request.headers
     assert post.calls.last.request.headers["Content-Type"] == "application/json"
+
+
+@respx.mock
+@pytest.mark.parametrize("errors", ["oops", ["oops", 1], {"code": "X"}])
+def test_malformed_error_entries_are_ignored(errors) -> None:
+    respx.get(f"{DEFAULT_BASE_URL}/plans/p1").mock(
+        return_value=httpx.Response(404, json={"errors": errors})
+    )
+    with pytest.raises(KardinalError) as info:
+        _transport().request("GET", "/plans/p1")
+    assert info.value.code == "NOT_FOUND"
+    assert info.value.errors == []
+    assert info.value.details is None

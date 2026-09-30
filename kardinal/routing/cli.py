@@ -21,6 +21,15 @@ routing.add_typer(plans, name="plans")
 routing.add_typer(solutions, name="solutions")
 
 
+def _waited(solution) -> dict:
+    """What `wait()` returned, as printed: `final_state` is spelled
+    `finalState`, like every other field of the API's JSON (and the
+    TypeScript CLI's output)."""
+    payload = solution.model_dump(mode="json", exclude_none=True)
+    payload["finalState"] = payload.pop("final_state", None)
+    return payload
+
+
 def _client():
     # cli_client() imports the client lazily, so `--help` answers without
     # loading the models or opening a connection. Used as a context manager
@@ -56,7 +65,7 @@ def plans_submit(
 
 
 @plans.command("get")
-def plans_get(plan_id: str, json_out: bool = typer.Option(False, "--json")) -> None:
+def plans_get(plan_id: str, json_out: bool = typer.Option(False, "--json", help="Force JSON output.")) -> None:
     """Retrieve a plan by id."""
     try:
         with _client() as client:
@@ -72,7 +81,7 @@ def plans_update(
         ..., exists=True, help="JSON file with the full plan, including its id."
     ),
     force: bool = typer.Option(False, "--force", help="Unarchive the plan first, if archived."),
-    json_out: bool = typer.Option(False, "--json"),
+    json_out: bool = typer.Option(False, "--json", help="Force JSON output."),
 ) -> None:
     """Update a plan. Re-optimizes if needed; only new unique stops are billed."""
     from .plans import Plan
@@ -108,10 +117,12 @@ def plans_delete(plan_id: str) -> None:
 
 @plans.command("list")
 def plans_list(
-    page: int = 1,
-    items_per_page: int = 20,
-    archived: Literal["excluded", "included", "only"] = "excluded",
-    json_out: bool = typer.Option(False, "--json"),
+    page: int = typer.Option(1, help="Page number."),
+    items_per_page: int = typer.Option(20, help="Items per page."),
+    archived: Literal["excluded", "included", "only"] = typer.Option(
+        "excluded", help="Which plans to list."
+    ),
+    json_out: bool = typer.Option(False, "--json", help="Force JSON output."),
 ) -> None:
     """List plans, one page at a time."""
     try:
@@ -131,7 +142,7 @@ def plans_list(
 def plans_start(
     plan_id: str,
     force: bool = typer.Option(False, "--force", help="Unarchive the plan first, if archived."),
-    json_out: bool = typer.Option(False, "--json"),
+    json_out: bool = typer.Option(False, "--json", help="Force JSON output."),
 ) -> None:
     """Restart optimization on a stopped plan."""
     try:
@@ -146,7 +157,7 @@ def plans_start(
 def plans_stop(
     plan_id: str,
     force: bool = typer.Option(False, "--force", help="Unarchive the plan first, if archived."),
-    json_out: bool = typer.Option(False, "--json"),
+    json_out: bool = typer.Option(False, "--json", help="Force JSON output."),
 ) -> None:
     """Stop optimization on a plan without changing its data."""
     try:
@@ -158,7 +169,7 @@ def plans_stop(
 
 
 @plans.command("status")
-def plans_status(plan_id: str, json_out: bool = typer.Option(False, "--json")) -> None:
+def plans_status(plan_id: str, json_out: bool = typer.Option(False, "--json", help="Force JSON output.")) -> None:
     """Show the plan's current optimization state."""
     try:
         with _client() as client:
@@ -170,7 +181,9 @@ def plans_status(plan_id: str, json_out: bool = typer.Option(False, "--json")) -
 
 
 @plans.command("validate")
-def plans_validate(file: Path = typer.Argument(..., exists=True)) -> None:
+def plans_validate(
+    file: Path = typer.Argument(..., exists=True, help="JSON file with the plan."),
+) -> None:
     """Validate a plan locally. No API call, no credits consumed."""
     from .plans import PlanCreate
 
@@ -189,7 +202,7 @@ def plans_validate(file: Path = typer.Argument(..., exists=True)) -> None:
 
 
 @solutions.command("get")
-def solutions_get(plan_id: str, json_out: bool = typer.Option(False, "--json")) -> None:
+def solutions_get(plan_id: str, json_out: bool = typer.Option(False, "--json", help="Force JSON output.")) -> None:
     """Retrieve a plan's solution."""
     try:
         with _client() as client:
@@ -201,7 +214,7 @@ def solutions_get(plan_id: str, json_out: bool = typer.Option(False, "--json")) 
 
 @solutions.command("objectives")
 def solutions_objectives(
-    plan_id: str, json_out: bool = typer.Option(False, "--json")
+    plan_id: str, json_out: bool = typer.Option(False, "--json", help="Force JSON output.")
 ) -> None:
     """Objective values only, without the full solution."""
     try:
@@ -219,7 +232,7 @@ def solutions_objectives(
 def solutions_wait(
     plan_id: str,
     timeout: Optional[float] = typer.Option(None, help="Hard timeout, in seconds."),
-    json_out: bool = typer.Option(False, "--json"),
+    json_out: bool = typer.Option(False, "--json", help="Force JSON output."),
 ) -> None:
     """Block until the plan finishes optimizing, then print its solution."""
     try:
@@ -227,11 +240,11 @@ def solutions_wait(
             solution = client.routing.solutions.wait(plan_id, timeout=timeout)
     except KardinalError as exc:
         fail(exc)
-    emit(solution, force_json=json_out)
+    emit(_waited(solution), force_json=json_out)
 
 
 @routing.command("demo")
-def routing_demo(json_out: bool = typer.Option(False, "--json")) -> None:
+def routing_demo(json_out: bool = typer.Option(False, "--json", help="Force JSON output.")) -> None:
     """Submit the example plan and wait for its solution."""
     from . import examples
 
@@ -248,4 +261,4 @@ def routing_demo(json_out: bool = typer.Option(False, "--json")) -> None:
             solution = client.routing.solutions.wait(plan.id)
     except KardinalError as exc:
         fail(exc)
-    emit(solution, force_json=json_out)
+    emit(_waited(solution), force_json=json_out)

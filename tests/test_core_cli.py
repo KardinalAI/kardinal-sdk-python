@@ -61,3 +61,12 @@ def test_fail_shows_details_so_each_kind_of_limit_can_be_told_apart(capsys) -> N
     with pytest.raises(typer.Exit):
         fail(exc)
     assert '"details": "Monthly credit quota exhausted"' in capsys.readouterr().out
+
+
+def test_emit_prints_non_string_table_values_as_json(monkeypatch, capsys) -> None:
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    emit({"id": "p1", "running": True, "tags": ["a"]}, force_json=False)
+    out = capsys.readouterr().out
+    assert "true" in out
+    assert '["a"]' in out
+    assert "'" not in out

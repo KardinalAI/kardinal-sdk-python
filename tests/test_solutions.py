@@ -413,3 +413,15 @@ def test_wait_timeout_names_a_state_this_sdk_does_not_know(clock) -> None:
         solutions.wait(_PLAN_ID, timeout=30)
     assert "someFutureState" in str(info.value)
 
+
+
+@respx.mock
+def test_solution_warnings_with_a_code_this_sdk_does_not_know_still_parse() -> None:
+    respx.get(f"{_PLAN_URL}/solution").mock(
+        return_value=httpx.Response(200, json={
+            "item": {"planId": _PLAN_ID, "planVersion": 1},
+            "warnings": [{"code": "SOME_FUTURE_CODE", "message": "m"}],
+        })
+    )
+    _, solutions = _apis()
+    assert solutions.get(_PLAN_ID).warnings[0].code.value == "SOME_FUTURE_CODE"

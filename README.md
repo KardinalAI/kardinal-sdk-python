@@ -93,7 +93,9 @@ back to the environment variable.
 Sandbox and production share the same host: the API key you use determines
 which of your agencies a call applies to.
 
-`timeout` (seconds) is passed to `httpx` as each request's timeout.
+`timeout` (seconds) is passed to `httpx` as each request's timeout, which
+applies to each phase (connecting, sending, each read of the response)
+separately, not to the request as a whole.
 `max_retries` is how many times a read, `update()`, `delete()`, `start()` or
 `stop()` is retried after a network error, a `429` or a `5xx`; `submit()` is
 never retried (see "Good to know" below).
@@ -273,7 +275,9 @@ terminal, since it's the one output shape a caller is most likely to parse
 programmatically. Exit codes: `0` success, `1` business error, `2` usage
 error. The CLI reads the same `KARDINAL_API_KEY` / `KARDINAL_BASE_URL` as
 `Kardinal()` (see Configuration above), with no `--api-key` flag, so a key
-never lands in shell history or the process list.
+never lands in shell history or the process list. `solutions wait` takes
+`--timeout <seconds>`, and prints how the optimization ended as
+`finalState`, like the API's other fields.
 
 ## Good to know
 

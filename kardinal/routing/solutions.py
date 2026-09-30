@@ -16,6 +16,7 @@ from .._core.errors import (
 )
 from .._core.transport import Transport
 from . import models
+from ._annotations import validate_response
 from .plans import PlansAPI
 
 # Polling cadence agreed with the backend team: never more often than every
@@ -87,9 +88,9 @@ class SolutionsAPI:
         (compare `planVersion`). `wait()` handles all of that.
         """
         response = self._transport.request("GET", f"/plans/{plan_id}/solution")
-        solution = Solution.model_validate(response["item"])
+        solution = validate_response(Solution, response["item"])
         solution.warnings = [
-            models.Warning.model_validate(w) for w in response.get("warnings") or []
+            validate_response(models.Warning, w) for w in response.get("warnings") or []
         ]
         return solution
 
@@ -100,8 +101,8 @@ class SolutionsAPI:
         """
         response = self._transport.request("GET", f"/plans/{plan_id}/solution/objectives")
         return SolutionObjectives(
-            [models.SolutionObjective.model_validate(item) for item in response.get("items") or []],
-            [models.Warning.model_validate(w) for w in response.get("warnings") or []],
+            [validate_response(models.SolutionObjective, item) for item in response.get("items") or []],
+            [validate_response(models.Warning, w) for w in response.get("warnings") or []],
         )
 
     def wait(self, plan_id: str, timeout: Optional[float] = None) -> Solution:

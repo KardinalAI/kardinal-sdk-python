@@ -96,9 +96,10 @@ class KardinalNotFoundError(KardinalError):
 
 
 class KardinalRateLimitError(KardinalError):
-    """429. Not documented in openapi.yaml as of this writing (no response
-    shape to parse a business `code`/`message` from), hence "outside the
-    envelope": `.code` is set to the synthetic value `"RATE_LIMITED"`.
+    """429: a temporary overload, not a quota — retry after a pause, with an
+    increasing delay. The response has an empty body (no envelope to parse
+    a business `code`/`message` from): `.code` is set to the synthetic value
+    `"RATE_LIMITED"`.
     """
 
 

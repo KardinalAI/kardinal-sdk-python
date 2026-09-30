@@ -11,7 +11,8 @@ from pydantic import BaseModel, ConfigDict
 
 from .._core.pagination import Page, iter_all as _iter_all
 from .._core.transport import Transport
-from . import _annotations  # noqa: F401  (import side effect: patches models.PlanId)
+from . import _annotations  # import side effect: patches models.PlanId
+from ._annotations import validate_response
 from . import models
 
 
@@ -142,8 +143,8 @@ def _plan_from_envelope(response: Dict[str, object]) -> Plan:
     returned `Plan` — `warnings` is a sibling of `item` in the response
     body, not a field `Plan.model_validate(item)` would ever see on its own.
     """
-    plan = Plan.model_validate(response["item"])
-    plan.warnings = [models.Warning.model_validate(w) for w in response.get("warnings") or []]
+    plan = validate_response(Plan, response["item"])
+    plan.warnings = [validate_response(models.Warning, w) for w in response.get("warnings") or []]
     return plan
 
 
@@ -172,7 +173,8 @@ class PlansAPI:
 
     def update(self, plan: Plan, *, force: bool = False) -> Plan:
         """`PUT /plans/{id}`. Sends the complete plan, replacing the stored one
-        (anything left out is removed). The version increments, and the plan
+        (anything left out is removed; fields this SDK version doesn't know,
+        read by `get()`, are kept and sent back). The version increments, and the plan
         is re-optimized, only if the plan actually changed: an identical PUT
         is a free no-op, returning the same version. Only newly added unique
         stops are billed.
@@ -213,7 +215,7 @@ class PlansAPI:
         )
         paging = response["paging"]
         return Page(
-            items=[models.PlanLight.model_validate(item) for item in response.get("items") or []],
+            items=[validate_response(models.PlanLight, item) for item in response.get("items") or []],
             page=paging["page"],
             total_pages=paging["totalPages"],
             total=paging["total"],
@@ -239,7 +241,7 @@ class PlansAPI:
         response = self._transport.request(
             "PUT", f"/plans/{plan_id}/running", json=True, params={"force": force}
         )
-        return models.EnvelopedPlanReference.model_validate(response)
+        return validate_response(models.EnvelopedPlanReference, response)
 
     def stop(self, plan_id: str, *, force: bool = False) -> models.EnvelopedPlanReference:
         """`PUT /plans/{id}/running` with `false`. Stops optimization on
@@ -251,7 +253,7 @@ class PlansAPI:
         response = self._transport.request(
             "PUT", f"/plans/{plan_id}/running", json=False, params={"force": force}
         )
-        return models.EnvelopedPlanReference.model_validate(response)
+        return validate_response(models.EnvelopedPlanReference, response)
 
     def get_status(self, plan_id: str) -> Union[models.PlanState, str]:
         """`GET /plans/{id}/state`. Returns the plan's current `PlanState`

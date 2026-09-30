@@ -66,6 +66,12 @@ class Kardinal:
     `base_url` defaults to `KARDINAL_BASE_URL`, then
     `https://app.kardinal.ai/api/v2`: sandbox and production share that host,
     and the API key determines which agency a call applies to.
+
+    `timeout` (seconds) is each request's `httpx` timeout, applied to each
+    phase (connect, read, write) separately. `max_retries` is how many times
+    a read, `update()`, `delete()`, `start()` or `stop()` is retried after a
+    network error, a 429 or a 5xx (`submit()` never is).
+
     Usable as a context manager, or call `close()` directly.
     """
 

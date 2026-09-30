@@ -29,7 +29,7 @@ app.add_typer(auth_app, name="auth")
 
 
 @auth_app.command("check")
-def auth_check(json_out: bool = typer.Option(False, "--json")) -> None:
+def auth_check(json_out: bool = typer.Option(False, "--json", help="Force JSON output.")) -> None:
     """The first thing to run when nothing else works: confirms the API key
     works, and reports the host it was checked against and the agency
     (sandbox or production) it resolves to.
