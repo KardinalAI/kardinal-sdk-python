@@ -2,7 +2,13 @@ import httpx
 import pytest
 import respx
 
-from kardinal._core.errors import KardinalConnectionError, KardinalError, KardinalServerError
+from kardinal._core.errors import (
+    KardinalConnectionError,
+    KardinalError,
+    KardinalRateLimitError,
+    KardinalServerError,
+    KardinalValidationError,
+)
 from kardinal._core.transport import DEFAULT_BASE_URL, Transport, resolve_base_url
 
 _ENV_VAR_URL = "https://api.example.com/v2"
@@ -186,3 +192,53 @@ def test_error_response_whose_json_body_is_not_an_object_falls_back_to_empty_err
         _transport().request("GET", "/plans/p1")
     assert exc_info.value.code == "INTERNAL_SERVER_ERROR"
     assert exc_info.value.errors == []
+
+
+@respx.mock
+def test_a_429_is_retryable_even_on_post() -> None:
+    respx.post(f"{DEFAULT_BASE_URL}/plans").mock(return_value=httpx.Response(429))
+    with pytest.raises(KardinalRateLimitError) as info:
+        Transport(api_key="test-key").request("POST", "/plans", json={})
+    assert info.value.retryable is True
+
+
+def test_a_real_refused_connection_is_retryable_even_on_post() -> None:
+    # Nothing listens on this port: the connection never opened, so the
+    # request was never sent.
+    transport = Transport(api_key="test-key", base_url="http://127.0.0.1:59999/api/v2", max_retries=0)
+    with pytest.raises(KardinalConnectionError) as info:
+        transport.request("POST", "/plans", json={})
+    assert info.value.retryable is True
+
+
+@respx.mock
+def test_the_envelope_warnings_reach_the_error() -> None:
+    warnings = [{"code": "INVALID_VALUE", "message": "amended"}]
+    respx.post(f"{DEFAULT_BASE_URL}/plans").mock(
+        return_value=httpx.Response(
+            400, json={"errors": [{"code": "INVALID_VALUE", "message": "bad"}], "warnings": warnings}
+        )
+    )
+    with pytest.raises(KardinalValidationError) as info:
+        _transport().request("POST", "/plans", json={})
+    assert info.value.warnings == warnings
+
+
+@respx.mock
+def test_a_3xx_is_reported_as_an_error_not_followed() -> None:
+    respx.get(f"{DEFAULT_BASE_URL}/plans/p1").mock(
+        return_value=httpx.Response(302, headers={"Location": "/elsewhere"})
+    )
+    with pytest.raises(KardinalValidationError) as info:
+        _transport().request("GET", "/plans/p1")
+    assert info.value.status == 302
+
+
+@respx.mock
+def test_content_type_is_sent_only_with_a_body() -> None:
+    get = respx.get(f"{DEFAULT_BASE_URL}/plans/p1").mock(return_value=httpx.Response(200, json={}))
+    post = respx.post(f"{DEFAULT_BASE_URL}/plans").mock(return_value=httpx.Response(200, json={}))
+    _transport().request("GET", "/plans/p1")
+    _transport().request("POST", "/plans", json={})
+    assert "Content-Type" not in get.calls.last.request.headers
+    assert post.calls.last.request.headers["Content-Type"] == "application/json"

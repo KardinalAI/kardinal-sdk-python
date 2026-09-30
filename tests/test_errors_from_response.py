@@ -221,3 +221,26 @@ def test_an_error_entry_without_code_or_message_falls_back_to_synthetic_values()
     assert isinstance(exc, KardinalNotFoundError)
     assert exc.code == "NOT_FOUND"
     assert str(exc) == "HTTP 404"
+
+
+def test_details_tell_two_404s_apart() -> None:
+    """A plan that doesn't exist and a plan with no solution yet are both
+    `404 NOT_FOUND`: only `details` tells them apart.
+    """
+    missing = from_response(
+        status=404, request_id=None,
+        errors=[{"code": "NOT_FOUND", "message": "m", "properties": {"details": "Plan not found"}}],
+    )
+    no_solution = from_response(
+        status=404, request_id=None,
+        errors=[{"code": "NOT_FOUND", "message": "m", "properties": {"details": "Solution not found"}}],
+    )
+    assert isinstance(missing, KardinalNotFoundError)
+    assert missing.details != no_solution.details
+
+
+def test_the_envelope_warnings_reach_the_error() -> None:
+    warnings = [{"code": "INVALID_VALUE", "message": "amended"}]
+    exc = from_response(status=400, request_id=None, errors=_error("INVALID_VALUE"), warnings=warnings)
+    assert exc.warnings == warnings
+
