@@ -402,3 +402,14 @@ def test_wait_keeps_polling_through_a_state_this_sdk_does_not_know(clock) -> Non
     plans, solutions = _apis()
     solution = solutions.wait(_PLAN_ID, timeout=600)
     assert solution.final_state == PlanState.optimized
+
+
+@respx.mock
+def test_wait_timeout_names_a_state_this_sdk_does_not_know(clock) -> None:
+    _mock_plan()
+    _mock_states(clock, [(0, "someFutureState", 1)])
+    _, solutions = _apis()
+    with pytest.raises(KardinalTimeoutError) as info:
+        solutions.wait(_PLAN_ID, timeout=30)
+    assert "someFutureState" in str(info.value)
+

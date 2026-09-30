@@ -152,7 +152,7 @@ class SolutionsAPI:
                 last = tracker["state"]
                 raise KardinalTimeoutError(
                     f"Timed out waiting for plan {plan_id!r} to finish optimizing "
-                    f"(last state seen: {last.value if last else 'none'}).",
+                    f"(last state seen: {getattr(last, 'value', last) if last else 'none'}).",
                     code="CLIENT_TIMEOUT",
                     status=0,
                     request_id=None,
