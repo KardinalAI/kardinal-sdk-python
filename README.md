@@ -297,7 +297,8 @@ never lands in shell history or the process list.
 - **`.request_id` is usually `None`**: it's only set when the server happens
   to send an `X-Request-Id` response header.
 - **`get_status()` returns a `PlanState`** (a single value), not the
-  detailed `PlanStatus` object embedded in `Plan.status`.
+  detailed `PlanStatus` object embedded in `Plan.status`; a state this SDK
+  version doesn't know yet comes back as its raw string.
 - **`get_objectives()` returns a plain `list`** of `SolutionObjective`,
   with a `.warnings` attribute attached.
 - **`start()` / `stop()` return an `EnvelopedPlanReference`** (`agencyId`,

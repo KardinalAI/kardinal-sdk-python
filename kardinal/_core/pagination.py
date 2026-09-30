@@ -15,6 +15,11 @@ T = TypeVar("T")
 
 @dataclass
 class Page(Generic[T]):
+    """One page of a paginated collection. `next_page` is `None` on the
+    last page, `previous_page` on the first; asking for a page past the
+    last one returns the last page.
+    """
+
     items: List[T]
     page: int
     total_pages: int

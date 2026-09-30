@@ -71,6 +71,8 @@ class SolutionObjectives(List[models.SolutionObjective]):
 
 
 class SolutionsAPI:
+    """`k.routing.solutions`: get, get_objectives, wait."""
+
     def __init__(self, transport: Transport, plans: PlansAPI) -> None:
         self._transport = transport
         self._plans = plans

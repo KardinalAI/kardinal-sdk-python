@@ -13,6 +13,10 @@ API_KEY_ENV_VAR = "KARDINAL_API_KEY"
 
 
 class MissingApiKeyError(KardinalError):
+    """No API key: neither the `api_key` argument nor the `KARDINAL_API_KEY`
+    environment variable is set.
+    """
+
     def __init__(self) -> None:
         super().__init__(
             f"No API key provided. Pass api_key=... to Kardinal(), or set the "

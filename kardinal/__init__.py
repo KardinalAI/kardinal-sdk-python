@@ -87,6 +87,9 @@ class Kardinal:
         self.routing = _Routing(self._transport)
 
     def close(self) -> None:
+        """Closes the underlying `httpx` connection pool. Idempotent; any
+        request made afterwards raises `KardinalError` (`CLIENT_CLOSED`).
+        """
         self._transport.close()
 
     def __enter__(self) -> "Kardinal":

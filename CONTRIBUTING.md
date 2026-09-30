@@ -61,6 +61,9 @@ https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/
 kardinal-ai==X.Y.Z.devN`. A real release (a `vX.Y.Z` tag) always publishes
 the version from `pyproject.toml` as is.
 
+The TypeScript SDK has no such test registry: its pre-releases go to the
+real npm registry, kept off `latest` by the `next` dist-tag.
+
 ### The spec
 
 `spec/openapi.yaml` is a copy of the `openapi.yaml` of the Kardinal API docs,

@@ -148,6 +148,10 @@ def _plan_from_envelope(response: Dict[str, object]) -> Plan:
 
 
 class PlansAPI:
+    """`k.routing.plans`: submit, get, update, delete, list/iter_all, start,
+    stop, get_status.
+    """
+
     def __init__(self, transport: Transport) -> None:
         self._transport = transport
 
