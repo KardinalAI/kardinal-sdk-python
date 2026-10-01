@@ -958,8 +958,7 @@ components:
       description: A plan in a light representation (without resources, orders, constraints, and so on).
       properties:
         id:
-          allOf:
-            - $ref: '#/components/schemas/PlanId'
+          $ref: '#/components/schemas/PlanId'
         agencyId:
           allOf:
             - $ref: '#/components/schemas/AgencyId'
@@ -1281,8 +1280,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/AgencyId'
         planId:
-          allOf:
-            - $ref: '#/components/schemas/PlanId'
+          $ref: '#/components/schemas/PlanId'
         planVersion:
           allOf:
             - $ref: '#/components/schemas/PlanVersion'
@@ -1301,8 +1299,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/AgencyId'
         planId:
-          allOf:
-            - $ref: '#/components/schemas/PlanId'
+          $ref: '#/components/schemas/PlanId'
         planVersion:
           description: "The plan's current version: unchanged by this request."
           allOf:
@@ -1370,8 +1367,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/AgencyId'
         planId:
-          allOf:
-            - $ref: '#/components/schemas/PlanId'
+          $ref: '#/components/schemas/PlanId'
     PlanStatus:
       type: object
       readOnly: true
@@ -1620,8 +1616,7 @@ components:
           description: Breaks to schedule into this resource's tour; see `Break` for the three available kinds.
           type: array
           items:
-            allOf:
-              - $ref: '#/components/schemas/Break'
+            $ref: '#/components/schemas/Break'
         operationDurationPolicies:
           description: Policies excluding specific operation durations from this resource's tour; see `OperationDurationPolicy`.
           type: array
@@ -1831,8 +1826,7 @@ components:
           type: array
           uniqueItems: true
           items:
-            allOf:
-              - $ref: '#/components/schemas/Stop'
+            $ref: '#/components/schemas/Stop'
         successiveStops:
           description: |
             The order's stops must be visited consecutively, with nothing from another order in between. Mutually exclusive with `maxStopSpan`.
@@ -3032,8 +3026,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/AgencyId'
         planId:
-          allOf:
-            - $ref: '#/components/schemas/PlanId'
+          $ref: '#/components/schemas/PlanId'
         planVersion:
           allOf:
             - $ref: '#/components/schemas/PlanVersion'
@@ -3153,8 +3146,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/AgencyId'
         planId:
-          allOf:
-            - $ref: '#/components/schemas/PlanId'
+          $ref: '#/components/schemas/PlanId'
         planVersion:
           allOf:
             - $ref: '#/components/schemas/PlanVersion'
@@ -3199,8 +3191,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/AgencyId'
         planId:
-          allOf:
-            - $ref: '#/components/schemas/PlanId'
+          $ref: '#/components/schemas/PlanId'
         planVersion:
           allOf:
             - $ref: '#/components/schemas/PlanVersion'
@@ -3290,8 +3281,7 @@ components:
         violations:
           type: array
           items:
-            allOf:
-              - $ref: '#/components/schemas/TourViolation'
+            $ref: '#/components/schemas/TourViolation'
           description: Constraint violations found on this tour.
         wayPoints:
           type: array
@@ -3852,8 +3842,7 @@ components:
           description: Lists of sub-constraints violations.
           type: array
           items:
-            allOf:
-              - $ref: '#/components/schemas/TourViolation'
+            $ref: '#/components/schemas/TourViolation'
       required:
         - type
         - name
@@ -3965,8 +3954,7 @@ components:
         violations:
           type: array
           items:
-            allOf:
-              - $ref: '#/components/schemas/WaypointViolation'
+            $ref: '#/components/schemas/WaypointViolation'
           description: Constraint violations found at this waypoint.
         fromPrevious:
           allOf:
@@ -4029,8 +4017,7 @@ components:
         violations:
           type: array
           items:
-            allOf:
-              - $ref: '#/components/schemas/WaypointViolation'
+            $ref: '#/components/schemas/WaypointViolation'
           description: Constraint violations found at this waypoint.
         fromPrevious:
           allOf:
@@ -4067,8 +4054,7 @@ components:
         violations:
           type: array
           items:
-            allOf:
-              - $ref: '#/components/schemas/WaypointViolation'
+            $ref: '#/components/schemas/WaypointViolation'
           description: Constraint violations found at this waypoint.
         fromPrevious:
           allOf:
@@ -4100,8 +4086,7 @@ components:
         violations:
           type: array
           items:
-            allOf:
-              - $ref: '#/components/schemas/WaypointViolation'
+            $ref: '#/components/schemas/WaypointViolation'
           description: Constraint violations found at this waypoint.
         fromPrevious:
           allOf:
@@ -4410,8 +4395,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/AgencyId'
         planId:
-          allOf:
-            - $ref: '#/components/schemas/PlanId'
+          $ref: '#/components/schemas/PlanId'
         url:
           type: string
           description: The secure webhook URL (must be https).
@@ -4463,8 +4447,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/AgencyId'
         planId:
-          allOf:
-            - $ref: '#/components/schemas/PlanId'
+          $ref: '#/components/schemas/PlanId'
     EnvelopedPlanWebhooks:
       type: object
       description: The full list of webhook registrations, as returned by the webhook-listing endpoint.
@@ -4479,8 +4462,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/AgencyId'
         planId:
-          allOf:
-            - $ref: '#/components/schemas/PlanId'
+          $ref: '#/components/schemas/PlanId'
     WebhookCreate:
       type: object
       description: Payload to register a new webhook on a plan.
@@ -4555,8 +4537,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/AgencyId'
         planId:
-          allOf:
-            - $ref: '#/components/schemas/PlanId'
+          $ref: '#/components/schemas/PlanId'
         planVersion:
           allOf:
             - $ref: '#/components/schemas/PlanVersion'
@@ -4600,5 +4581,4 @@ components:
           allOf:
             - $ref: '#/components/schemas/AgencyId'
         planId:
-          allOf:
-            - $ref: '#/components/schemas/PlanId'
+          $ref: '#/components/schemas/PlanId'

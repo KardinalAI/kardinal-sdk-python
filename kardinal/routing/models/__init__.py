@@ -136,10 +136,6 @@ class MaxInterStopDistanceInKmBounds(BaseModel):
     )
 
 
-class Break1(BaseModel):
-    pass
-
-
 class ResourceMode(Enum):
     """
     Whether the engine may add stops to this resource's tour beyond its `state.assignments` (`free`), or must limit the tour to those assigned entries (`fixed`). How each entry is treated within the tour is set separately, by its `status` (see `AssignmentStatus`).
@@ -186,10 +182,6 @@ class Type1(Enum):
     """
 
     alternatives = 'alternatives'
-
-
-class Stop11(BaseModel):
-    pass
 
 
 class Type2(Enum):
@@ -1106,10 +1098,6 @@ class Mode1(RootModel[ResourceMode]):
     root: ResourceMode
 
 
-class Violation1(BaseModel):
-    pass
-
-
 class Type19(Enum):
     """
     Discriminator identifying this violation as `maxCumulatedCost`.
@@ -1616,74 +1604,6 @@ class Type36(Enum):
     atLeastOneConstraint = 'atLeastOneConstraint'
 
 
-class ViolatedConstraint1(BaseModel):
-    pass
-
-
-class ViolatedConstraint2(BeginViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint3(EndViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint4(SkillsViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint5(ForbiddenAssignmentViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint6(AuthorizedTimeWindowViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint7(CapacityViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint8(AtLeastOneValidCapacityViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint9(SuccessiveStopsViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint10(OrderViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint11(MaxStopSpanViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint12(WorkingTimeWindowViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint13(MaxWorkingDurationViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint14(MaxDistanceInKmViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint15(MaxInterStopDistanceInKmViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint16(MaxInterStopDurationViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint17(StopIncompatibilityViolation, ViolatedConstraint1):
-    pass
-
-
 class Type37(Enum):
     """
     Discriminator identifying this violation as `maxStopTagGroups`.
@@ -1747,215 +1667,12 @@ class Status4(RootModel[WayPointStatus]):
     root: WayPointStatus
 
 
-class Violation211(BaseModel):
-    pass
-
-
-class Violation212(BeginViolation, Violation211):
-    pass
-
-
-class Violation213(EndViolation, Violation211):
-    pass
-
-
-class Violation214(SkillsViolation, Violation211):
-    pass
-
-
-class Violation215(ForbiddenAssignmentViolation, Violation211):
-    pass
-
-
-class Violation216(AuthorizedTimeWindowViolation, Violation211):
-    pass
-
-
-class Violation217(CapacityViolation, Violation211):
-    pass
-
-
-class Violation218(AtLeastOneValidCapacityViolation, Violation211):
-    pass
-
-
-class Violation219(MaxInterStopDistanceInKmViolation, Violation211):
-    pass
-
-
-class Violation2110(MaxInterStopDurationViolation, Violation211):
-    pass
-
-
-class Violation21(
-    RootModel[
-        Union[
-            Violation212,
-            Violation213,
-            Violation214,
-            Violation215,
-            Violation216,
-            Violation217,
-            Violation218,
-            Violation219,
-            Violation2110,
-        ]
-    ]
-):
-    root: Union[
-        Violation212,
-        Violation213,
-        Violation214,
-        Violation215,
-        Violation216,
-        Violation217,
-        Violation218,
-        Violation219,
-        Violation2110,
-    ]
-
-
-class WayPointBegin(BaseModel):
-    """
-    The start of a tour, where the resource departs from.
-    """
-
-    type: Literal['begin'] = Field(
-        ..., description="Discriminator identifying this waypoint as the tour's begin."
-    )
-    position: Position = Field(
-        ..., description='Geographic position the resource departs from.'
-    )
-    status: Optional[Status4] = Field(None, examples=['fixed'])
-    departureTime: Optional[DateTime] = Field(
-        None, description='Time the resource departs.'
-    )
-    violations: Optional[List[Violation21]] = Field(
-        None, description='Constraint violations found at this waypoint.'
-    )
-    fromPrevious: Optional[FromPrevious] = None
-
-
 class Type40(Enum):
     """
     Discriminator identifying this waypoint as a stop.
     """
 
     stop = 'stop'
-
-
-class Violation221(BaseModel):
-    pass
-
-
-class Violation222(BeginViolation, Violation221):
-    pass
-
-
-class Violation223(EndViolation, Violation221):
-    pass
-
-
-class Violation224(SkillsViolation, Violation221):
-    pass
-
-
-class Violation225(ForbiddenAssignmentViolation, Violation221):
-    pass
-
-
-class Violation226(AuthorizedTimeWindowViolation, Violation221):
-    pass
-
-
-class Violation227(CapacityViolation, Violation221):
-    pass
-
-
-class Violation228(AtLeastOneValidCapacityViolation, Violation221):
-    pass
-
-
-class Violation229(MaxInterStopDistanceInKmViolation, Violation221):
-    pass
-
-
-class Violation2210(MaxInterStopDurationViolation, Violation221):
-    pass
-
-
-class Violation22(
-    RootModel[
-        Union[
-            Violation222,
-            Violation223,
-            Violation224,
-            Violation225,
-            Violation226,
-            Violation227,
-            Violation228,
-            Violation229,
-            Violation2210,
-        ]
-    ]
-):
-    root: Union[
-        Violation222,
-        Violation223,
-        Violation224,
-        Violation225,
-        Violation226,
-        Violation227,
-        Violation228,
-        Violation229,
-        Violation2210,
-    ]
-
-
-class WayPointStop(BaseModel):
-    """
-    A single stop visited on a tour.
-    """
-
-    type: Literal['stop'] = Field(
-        ..., description='Discriminator identifying this waypoint as a stop.'
-    )
-    stopId: Optional[RegexIdValidation] = Field(
-        None, description='Id of the visited stop.', examples=['stop1']
-    )
-    position: Position = Field(..., description='Geographic position of the stop.')
-    status: Optional[Status4] = Field(None, examples=['optimized'])
-    stopProperties: Optional[Properties] = Field(
-        None, description='Free-form properties carried over from the stop itself.'
-    )
-    orderProperties: Optional[Properties] = Field(
-        None,
-        description='Free-form properties carried over from the order this stop belongs to.',
-    )
-    filledCapacitiesAfterStop: Optional[Capacities] = Field(
-        None,
-        description='Capacities loaded on the resource immediately after this stop.',
-    )
-    delay: Optional[Duration] = Field(
-        None, description="Delay related to the stop's preferred time windows."
-    )
-    arrivalTime: Optional[DateTime] = Field(
-        None, description='Time the resource reaches the stop.'
-    )
-    beginTime: Optional[DateTime] = Field(
-        None, description='Time the resource starts serving the stop.'
-    )
-    departureTime: Optional[DateTime] = Field(
-        None, description='Time the resource leaves the stop.'
-    )
-    violations: Optional[List[Violation22]] = Field(
-        None, description='Constraint violations found at this waypoint.'
-    )
-    fromPrevious: Optional[FromPrevious] = None
-    stopKind: Optional[StopKind] = Field(
-        'delivery',
-        description="This stop's operation label, carried over from the stop itself.",
-    )
 
 
 class Type41(Enum):
@@ -1966,186 +1683,12 @@ class Type41(Enum):
     break_ = 'break'
 
 
-class Violation231(BaseModel):
-    pass
-
-
-class Violation232(BeginViolation, Violation231):
-    pass
-
-
-class Violation233(EndViolation, Violation231):
-    pass
-
-
-class Violation234(SkillsViolation, Violation231):
-    pass
-
-
-class Violation235(ForbiddenAssignmentViolation, Violation231):
-    pass
-
-
-class Violation236(AuthorizedTimeWindowViolation, Violation231):
-    pass
-
-
-class Violation237(CapacityViolation, Violation231):
-    pass
-
-
-class Violation238(AtLeastOneValidCapacityViolation, Violation231):
-    pass
-
-
-class Violation239(MaxInterStopDistanceInKmViolation, Violation231):
-    pass
-
-
-class Violation2310(MaxInterStopDurationViolation, Violation231):
-    pass
-
-
-class Violation23(
-    RootModel[
-        Union[
-            Violation232,
-            Violation233,
-            Violation234,
-            Violation235,
-            Violation236,
-            Violation237,
-            Violation238,
-            Violation239,
-            Violation2310,
-        ]
-    ]
-):
-    root: Union[
-        Violation232,
-        Violation233,
-        Violation234,
-        Violation235,
-        Violation236,
-        Violation237,
-        Violation238,
-        Violation239,
-        Violation2310,
-    ]
-
-
-class WayPointBreak(BaseModel):
-    """
-    A resource break taken during a tour.
-    """
-
-    type: Literal['break'] = Field(
-        ..., description='Discriminator identifying this waypoint as a break.'
-    )
-    status: Optional[Status4] = Field(None, examples=['optimized'])
-    arrivalTime: Optional[DateTime] = Field(None, description='Time the break starts.')
-    departureTime: Optional[DateTime] = Field(None, description='Time the break ends.')
-    violations: Optional[List[Violation23]] = Field(
-        None, description='Constraint violations found at this waypoint.'
-    )
-    fromPrevious: Optional[FromPrevious] = None
-
-
 class Type42(Enum):
     """
     Discriminator identifying this waypoint as the tour's end.
     """
 
     end = 'end'
-
-
-class Violation241(BaseModel):
-    pass
-
-
-class Violation242(BeginViolation, Violation241):
-    pass
-
-
-class Violation243(EndViolation, Violation241):
-    pass
-
-
-class Violation244(SkillsViolation, Violation241):
-    pass
-
-
-class Violation245(ForbiddenAssignmentViolation, Violation241):
-    pass
-
-
-class Violation246(AuthorizedTimeWindowViolation, Violation241):
-    pass
-
-
-class Violation247(CapacityViolation, Violation241):
-    pass
-
-
-class Violation248(AtLeastOneValidCapacityViolation, Violation241):
-    pass
-
-
-class Violation249(MaxInterStopDistanceInKmViolation, Violation241):
-    pass
-
-
-class Violation2410(MaxInterStopDurationViolation, Violation241):
-    pass
-
-
-class Violation24(
-    RootModel[
-        Union[
-            Violation242,
-            Violation243,
-            Violation244,
-            Violation245,
-            Violation246,
-            Violation247,
-            Violation248,
-            Violation249,
-            Violation2410,
-        ]
-    ]
-):
-    root: Union[
-        Violation242,
-        Violation243,
-        Violation244,
-        Violation245,
-        Violation246,
-        Violation247,
-        Violation248,
-        Violation249,
-        Violation2410,
-    ]
-
-
-class WayPointEnd(BaseModel):
-    """
-    The end of a tour, where the resource finishes.
-    """
-
-    type: Literal['end'] = Field(
-        ..., description="Discriminator identifying this waypoint as the tour's end."
-    )
-    position: Position = Field(
-        ..., description='Geographic position the resource arrives at.'
-    )
-    status: Optional[Status4] = Field(None, examples=['optimized'])
-    arrivalTime: Optional[DateTime] = Field(
-        None, description='Time the resource arrives.'
-    )
-    violations: Optional[List[Violation24]] = Field(
-        None, description='Constraint violations found at this waypoint.'
-    )
-    fromPrevious: Optional[FromPrevious] = None
 
 
 class Type43(Enum):
@@ -2562,22 +2105,6 @@ class MaxInterStopDurationBounds(BaseModel):
     )
 
 
-class Break2(TimeWindowBreak, Break1):
-    pass
-
-
-class Break3(TravelDurationSlidingBreak, Break1):
-    pass
-
-
-class Break4(WorkingDurationSlidingBreak, Break1):
-    pass
-
-
-class Break(RootModel[Union[Break2, Break3, Break4]]):
-    root: Union[Break2, Break3, Break4]
-
-
 class SingleStop(BaseModel):
     """
     Only `id` and `position` are required. See `AlternativesStop` for a stop composed of several candidate `SingleStop` options instead of a single fixed one.
@@ -2646,56 +2173,6 @@ class AlternativesStop(BaseModel):
     )
 
 
-class Stop12(SingleStop, Stop11):
-    pass
-
-
-class Stop13(AlternativesStop, Stop11):
-    pass
-
-
-class Stop1(RootModel[Union[Stop12, Stop13]]):
-    root: Union[Stop12, Stop13]
-
-
-class Order(BaseModel):
-    """
-    One or more `stops` that must all be planned onto the *same* resource, in array order (position in the array acts as a precedence constraint). Only `id` and `stops` are required.
-
-    """
-
-    id: RegexIdValidation = Field(
-        ..., description='Order ids must be unique within a plan.', examples=['order1']
-    )
-    properties: Optional[Properties] = None
-    priority: Optional[int] = Field(
-        0,
-        description="Relative importance of the order; lower is more important, and the value can be negative.\n\n> **When to use.** Lower an order's priority, or mark it `optional`, to make an acceptable-to-drop trade-off explicit rather than an unplanned side effect once the fleet is under pressure from higher-priority stops.\n\n> **Modelling pitfall.** Priority levels are strict tiers, not weights: one more planned stop of a more important level outweighs any number of stops of a less important level.\n",
-        examples=[0],
-    )
-    optional: Optional[bool] = Field(
-        None,
-        description="If `true`, the order leaves the `maximizeMandatoryStops` objective: it can be left unplanned without affecting it, and is only placed if `maximizeOptionalStops` is in the plan's objectives. Without that objective it's unlikely to be planned, since it adds cost (distance, duration) without serving any higher-ranked objective.\n\n> **Modelling pitfall.** Not the same as a very low `priority`: a mandatory order, however low its priority, still counts towards `maximizeMandatoryStops`.\n",
-    )
-    requiredSkills: Optional[List[RegexIdValidation]] = Field(
-        None,
-        description='Hard requirement: a resource must have every listed skill to be assignable to this order.\n',
-        examples=[['forklift', 'truck']],
-    )
-    stops: List[Stop1] = Field(
-        ...,
-        description='The stops making up this order; see `Stop` for a single fixed stop vs. a group of alternatives.\n\n> **Default.** Capped at 3,000 stops per plan across all orders combined — see [Limits and quotas](https://developers.kardinal.ai/reference/limits-and-quotas).\n',
-    )
-    successiveStops: Optional[bool] = Field(
-        None,
-        description="The order's stops must be visited consecutively, with nothing from another order in between. Mutually exclusive with `maxStopSpan`.\n\n> **Default.** An order without `successiveStops` can have at most 4 stops; see [Limits and quotas](https://developers.kardinal.ai/reference/limits-and-quotas).\n",
-    )
-    maxStopSpan: Optional[Duration] = Field(
-        None,
-        description="Maximum time allowed to elapse between the order's stops (for example between a pickup and its delivery), without forcing them to be consecutive.\n",
-    )
-
-
 class SetupDuration(BaseModel):
     """
     Extra changeover duration inserted when a resource travels directly from a stop tagged `fromStopTag` to a stop tagged `toStopTag`.
@@ -2725,7 +2202,7 @@ class Direction(RootModel[OptimizationDirection]):
     root: OptimizationDirection
 
 
-class BreakModel(
+class Break(
     RootModel[
         Union[TimeWindowBreak, TravelDurationSlidingBreak, WorkingDurationSlidingBreak]
     ]
@@ -2940,78 +2417,6 @@ class EnvelopedSolutionObjectives(BaseModel):
     )
 
 
-class Violation2(BeginViolation, Violation1):
-    pass
-
-
-class Violation3(EndViolation, Violation1):
-    pass
-
-
-class Violation4(SkillsViolation, Violation1):
-    pass
-
-
-class Violation5(ForbiddenAssignmentViolation, Violation1):
-    pass
-
-
-class Violation6(AuthorizedTimeWindowViolation, Violation1):
-    pass
-
-
-class Violation7(CapacityViolation, Violation1):
-    pass
-
-
-class Violation8(AtLeastOneValidCapacityViolation, Violation1):
-    pass
-
-
-class Violation9(SuccessiveStopsViolation, Violation1):
-    pass
-
-
-class Violation10(OrderViolation, Violation1):
-    pass
-
-
-class Violation11(MaxStopSpanViolation, Violation1):
-    pass
-
-
-class Violation12(WorkingTimeWindowViolation, Violation1):
-    pass
-
-
-class Violation13(MaxWorkingDurationViolation, Violation1):
-    pass
-
-
-class Violation14(MaxDistanceInKmViolation, Violation1):
-    pass
-
-
-class Violation15(MaxInterStopDistanceInKmViolation, Violation1):
-    pass
-
-
-class Violation16(MaxInterStopDurationViolation, Violation1):
-    pass
-
-
-class Violation17(StopIncompatibilityViolation, Violation1):
-    pass
-
-
-class WayPoints(
-    RootModel[Union[WayPointBegin, WayPointStop, WayPointBreak, WayPointEnd]]
-):
-    root: Union[WayPointBegin, WayPointStop, WayPointBreak, WayPointEnd] = Field(
-        ..., discriminator='type'
-    )
-
-
 class WaypointViolation(
     RootModel[
         Union[
@@ -3080,6 +2485,111 @@ class RemovalStrategyViolation(BaseModel):
         examples=['lifoRule1'],
     )
     removalStrategyType: RemovalStrategyType
+
+
+class WayPointBegin(BaseModel):
+    """
+    The start of a tour, where the resource departs from.
+    """
+
+    type: Literal['begin'] = Field(
+        ..., description="Discriminator identifying this waypoint as the tour's begin."
+    )
+    position: Position = Field(
+        ..., description='Geographic position the resource departs from.'
+    )
+    status: Optional[Status4] = Field(None, examples=['fixed'])
+    departureTime: Optional[DateTime] = Field(
+        None, description='Time the resource departs.'
+    )
+    violations: Optional[List[WaypointViolation]] = Field(
+        None, description='Constraint violations found at this waypoint.'
+    )
+    fromPrevious: Optional[FromPrevious] = None
+
+
+class WayPointStop(BaseModel):
+    """
+    A single stop visited on a tour.
+    """
+
+    type: Literal['stop'] = Field(
+        ..., description='Discriminator identifying this waypoint as a stop.'
+    )
+    stopId: Optional[RegexIdValidation] = Field(
+        None, description='Id of the visited stop.', examples=['stop1']
+    )
+    position: Position = Field(..., description='Geographic position of the stop.')
+    status: Optional[Status4] = Field(None, examples=['optimized'])
+    stopProperties: Optional[Properties] = Field(
+        None, description='Free-form properties carried over from the stop itself.'
+    )
+    orderProperties: Optional[Properties] = Field(
+        None,
+        description='Free-form properties carried over from the order this stop belongs to.',
+    )
+    filledCapacitiesAfterStop: Optional[Capacities] = Field(
+        None,
+        description='Capacities loaded on the resource immediately after this stop.',
+    )
+    delay: Optional[Duration] = Field(
+        None, description="Delay related to the stop's preferred time windows."
+    )
+    arrivalTime: Optional[DateTime] = Field(
+        None, description='Time the resource reaches the stop.'
+    )
+    beginTime: Optional[DateTime] = Field(
+        None, description='Time the resource starts serving the stop.'
+    )
+    departureTime: Optional[DateTime] = Field(
+        None, description='Time the resource leaves the stop.'
+    )
+    violations: Optional[List[WaypointViolation]] = Field(
+        None, description='Constraint violations found at this waypoint.'
+    )
+    fromPrevious: Optional[FromPrevious] = None
+    stopKind: Optional[StopKind] = Field(
+        'delivery',
+        description="This stop's operation label, carried over from the stop itself.",
+    )
+
+
+class WayPointBreak(BaseModel):
+    """
+    A resource break taken during a tour.
+    """
+
+    type: Literal['break'] = Field(
+        ..., description='Discriminator identifying this waypoint as a break.'
+    )
+    status: Optional[Status4] = Field(None, examples=['optimized'])
+    arrivalTime: Optional[DateTime] = Field(None, description='Time the break starts.')
+    departureTime: Optional[DateTime] = Field(None, description='Time the break ends.')
+    violations: Optional[List[WaypointViolation]] = Field(
+        None, description='Constraint violations found at this waypoint.'
+    )
+    fromPrevious: Optional[FromPrevious] = None
+
+
+class WayPointEnd(BaseModel):
+    """
+    The end of a tour, where the resource finishes.
+    """
+
+    type: Literal['end'] = Field(
+        ..., description="Discriminator identifying this waypoint as the tour's end."
+    )
+    position: Position = Field(
+        ..., description='Geographic position the resource arrives at.'
+    )
+    status: Optional[Status4] = Field(None, examples=['optimized'])
+    arrivalTime: Optional[DateTime] = Field(
+        None, description='Time the resource arrives.'
+    )
+    violations: Optional[List[WaypointViolation]] = Field(
+        None, description='Constraint violations found at this waypoint.'
+    )
+    fromPrevious: Optional[FromPrevious] = None
 
 
 class AdditionalConstraintMaxStopTagGroups(BaseModel):
@@ -3411,6 +2921,44 @@ class Stop(RootModel[Union[SingleStop, AlternativesStop]]):
     )
 
 
+class Order(BaseModel):
+    """
+    One or more `stops` that must all be planned onto the *same* resource, in array order (position in the array acts as a precedence constraint). Only `id` and `stops` are required.
+
+    """
+
+    id: RegexIdValidation = Field(
+        ..., description='Order ids must be unique within a plan.', examples=['order1']
+    )
+    properties: Optional[Properties] = None
+    priority: Optional[int] = Field(
+        0,
+        description="Relative importance of the order; lower is more important, and the value can be negative.\n\n> **When to use.** Lower an order's priority, or mark it `optional`, to make an acceptable-to-drop trade-off explicit rather than an unplanned side effect once the fleet is under pressure from higher-priority stops.\n\n> **Modelling pitfall.** Priority levels are strict tiers, not weights: one more planned stop of a more important level outweighs any number of stops of a less important level.\n",
+        examples=[0],
+    )
+    optional: Optional[bool] = Field(
+        None,
+        description="If `true`, the order leaves the `maximizeMandatoryStops` objective: it can be left unplanned without affecting it, and is only placed if `maximizeOptionalStops` is in the plan's objectives. Without that objective it's unlikely to be planned, since it adds cost (distance, duration) without serving any higher-ranked objective.\n\n> **Modelling pitfall.** Not the same as a very low `priority`: a mandatory order, however low its priority, still counts towards `maximizeMandatoryStops`.\n",
+    )
+    requiredSkills: Optional[List[RegexIdValidation]] = Field(
+        None,
+        description='Hard requirement: a resource must have every listed skill to be assignable to this order.\n',
+        examples=[['forklift', 'truck']],
+    )
+    stops: List[Stop] = Field(
+        ...,
+        description='The stops making up this order; see `Stop` for a single fixed stop vs. a group of alternatives.\n\n> **Default.** Capped at 3,000 stops per plan across all orders combined — see [Limits and quotas](https://developers.kardinal.ai/reference/limits-and-quotas).\n',
+    )
+    successiveStops: Optional[bool] = Field(
+        None,
+        description="The order's stops must be visited consecutively, with nothing from another order in between. Mutually exclusive with `maxStopSpan`.\n\n> **Default.** An order without `successiveStops` can have at most 4 stops; see [Limits and quotas](https://developers.kardinal.ai/reference/limits-and-quotas).\n",
+    )
+    maxStopSpan: Optional[Duration] = Field(
+        None,
+        description="Maximum time allowed to elapse between the order's stops (for example between a pickup and its delivery), without forcing them to be consecutive.\n",
+    )
+
+
 class CostsByResourceTag(RootModel[Dict[str, Cost]]):
     """
     Cost structure mapped by resource tag. Unlike `emptyThresholdByCapacityByResourceTag` or `avoidEarlyLoadingsByResourceTag`, the wildcard tag "*" is not supported here — use a named resource tag for every entry.
@@ -3444,20 +2992,12 @@ class CustomObjective(BaseModel):
     )
 
 
-class Violation19(MaxStopTagGroupsViolation, Violation1):
-    pass
-
-
-class Violation20(RemovalStrategyViolation, Violation1):
-    pass
-
-
-class ViolatedConstraint19(MaxStopTagGroupsViolation, ViolatedConstraint1):
-    pass
-
-
-class ViolatedConstraint20(RemovalStrategyViolation, ViolatedConstraint1):
-    pass
+class WayPoints(
+    RootModel[Union[WayPointBegin, WayPointStop, WayPointBreak, WayPointEnd]]
+):
+    root: Union[WayPointBegin, WayPointStop, WayPointBreak, WayPointEnd] = Field(
+        ..., discriminator='type'
+    )
 
 
 class GlobalConstraintMaxCumulatedCost(BaseModel):
@@ -3861,7 +3401,7 @@ class Tour(BaseModel):
         None,
         description='Whether the tour satisfies every hard constraint on the resource.\n\n> **Modelling pitfall.** Reflects only hard-constraint satisfaction. A tour can have `isValid: true` while still carrying soft-constraint violations, such as missed preferred time windows reflected in `totalDelay`; check `violations` for the full picture rather than `isValid` alone.\n',
     )
-    violations: Optional[List[Violation]] = Field(
+    violations: Optional[List[TourViolation]] = Field(
         None, description='Constraint violations found on this tour.'
     )
     wayPoints: Optional[List[WayPoints]] = Field(
@@ -3899,7 +3439,7 @@ class AtLeastOneConstraintViolation(BaseModel):
         description='The name of the AtLeastOneConstraint constraint the violation is linked to.',
         examples=['orConstraint1'],
     )
-    violatedConstraints: List[ViolatedConstraint] = Field(
+    violatedConstraints: List[TourViolation] = Field(
         ..., description='Lists of sub-constraints violations.'
     )
 
@@ -3923,10 +3463,6 @@ class AdditionalConstraintAtLeastOneConstraint(BaseModel):
         ...,
         description='Constraints combined with OR logic; the tour is valid if at least one is satisfied.',
     )
-
-
-class Violation18(AtLeastOneConstraintViolation, Violation1):
-    pass
 
 
 class TourViolation(
@@ -3981,10 +3517,6 @@ class TourViolation(
     )
 
 
-class ViolatedConstraint18(AtLeastOneConstraintViolation, ViolatedConstraint1):
-    pass
-
-
 class AdditionalConstraints(
     RootModel[
         Union[
@@ -4033,106 +3565,8 @@ class Constraints(
     ] = Field(..., discriminator='type')
 
 
-class Violation(
-    RootModel[
-        Union[
-            Violation2,
-            Violation3,
-            Violation4,
-            Violation5,
-            Violation6,
-            Violation7,
-            Violation8,
-            Violation9,
-            Violation10,
-            Violation11,
-            Violation12,
-            Violation13,
-            Violation14,
-            Violation15,
-            Violation16,
-            Violation17,
-            Violation18,
-            Violation19,
-            Violation20,
-        ]
-    ]
-):
-    root: Union[
-        Violation2,
-        Violation3,
-        Violation4,
-        Violation5,
-        Violation6,
-        Violation7,
-        Violation8,
-        Violation9,
-        Violation10,
-        Violation11,
-        Violation12,
-        Violation13,
-        Violation14,
-        Violation15,
-        Violation16,
-        Violation17,
-        Violation18,
-        Violation19,
-        Violation20,
-    ]
-
-
-class ViolatedConstraint(
-    RootModel[
-        Union[
-            ViolatedConstraint2,
-            ViolatedConstraint3,
-            ViolatedConstraint4,
-            ViolatedConstraint5,
-            ViolatedConstraint6,
-            ViolatedConstraint7,
-            ViolatedConstraint8,
-            ViolatedConstraint9,
-            ViolatedConstraint10,
-            ViolatedConstraint11,
-            ViolatedConstraint12,
-            ViolatedConstraint13,
-            ViolatedConstraint14,
-            ViolatedConstraint15,
-            ViolatedConstraint16,
-            ViolatedConstraint17,
-            ViolatedConstraint18,
-            ViolatedConstraint19,
-            ViolatedConstraint20,
-        ]
-    ]
-):
-    root: Union[
-        ViolatedConstraint2,
-        ViolatedConstraint3,
-        ViolatedConstraint4,
-        ViolatedConstraint5,
-        ViolatedConstraint6,
-        ViolatedConstraint7,
-        ViolatedConstraint8,
-        ViolatedConstraint9,
-        ViolatedConstraint10,
-        ViolatedConstraint11,
-        ViolatedConstraint12,
-        ViolatedConstraint13,
-        ViolatedConstraint14,
-        ViolatedConstraint15,
-        ViolatedConstraint16,
-        ViolatedConstraint17,
-        ViolatedConstraint18,
-        ViolatedConstraint19,
-        ViolatedConstraint20,
-    ]
-
-
 AdditionalConstraintAtLeastOneConstraint.model_rebuild()
 AtLeastOneConstraintViolation.model_rebuild()
 Plan.model_rebuild()
 Solution.model_rebuild()
 Tour.model_rebuild()
-ViolatedConstraint18.model_rebuild()
-Violation18.model_rebuild()
