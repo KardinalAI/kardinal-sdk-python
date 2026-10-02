@@ -18,13 +18,12 @@ from . import models
 
 class Order(BaseModel):
     """Same shape as the generated `Order`, but `stops` takes a `SingleStop`
-    or `AlternativesStop` directly.
+    or `AlternativesStop` directly, and unknown fields are rejected.
 
-    The generated `Order.stops: List[Stop1]` forces wrapping each item in a
-    `Stop1`/`Stop12`/`Stop13` RootModel that exists only because openapi.yaml
-    writes `items: allOf: [$ref: Stop]` (a single-$ref `allOf`, which
-    datamodel-codegen wraps rather than aliases). Those wrapper classes add
-    no fields of their own, so the JSON this produces is identical.
+    The generated `Order.stops: List[Stop]` holds each item in a `Stop`
+    RootModel, so reading a stop back takes a `.root` hop; and the generated
+    model silently drops a misspelled field instead of failing. The JSON
+    this produces is identical.
     """
 
     model_config = ConfigDict(extra="forbid")
