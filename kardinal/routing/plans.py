@@ -9,6 +9,7 @@ from typing import Any, Dict, Iterator, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict
 
+from .._core.errors import UnknownFieldError
 from .._core.pagination import Page, iter_all as _iter_all
 from .._core.transport import Transport
 from . import _annotations  # import side effect: patches models.PlanId
@@ -160,6 +161,9 @@ class PlansAPI:
         """`POST /plans`. Creates a new plan and starts optimization —
         billed in full. The server assigns `id`.
         """
+        unknown = _annotations.unknown_fields(plan)
+        if unknown:
+            raise UnknownFieldError(unknown)
         body = plan.model_dump(mode="json", exclude_none=True)
         response = self._transport.request("POST", "/plans", json=body)
         return _plan_from_envelope(response)

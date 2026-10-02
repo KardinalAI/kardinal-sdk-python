@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from kardinal.routing import models
+from kardinal.routing._annotations import unknown_fields
 from kardinal.routing.plans import Order, PlanCreate
 
 _RESOURCE = {
@@ -72,10 +73,11 @@ def test_an_unknown_vehicle_profile_type_is_rejected() -> None:
         PlanCreate.model_validate({"resources": [{**_RESOURCE, "vehicleProfile": {"type": "boat"}}]})
 
 
-def test_unknown_resource_fields_are_dropped_and_priority_defaults_to_zero() -> None:
+def test_an_unknown_resource_field_is_kept_so_submit_can_report_it() -> None:
+    # Dropping it here is what used to make a misspelled optional field
+    # undetectable: `submit()` raises on what `unknown_fields()` finds.
     plan = PlanCreate.model_validate({"resources": [{**_RESOURCE, "bogus": 1}]})
-    dumped = plan.resources[0].model_dump(exclude_none=True)
-    assert "bogus" not in dumped
+    assert unknown_fields(plan) == ["plan.resources[0].bogus"]
     assert plan.resources[0].priority == 0
 
 

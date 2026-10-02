@@ -91,6 +91,29 @@ class KardinalValidationError(KardinalError):
     """
 
 
+class UnknownFieldError(KardinalError):
+    """A key no model declares was found in a plan being submitted.
+
+    Almost always a misspelled optional field. The API drops such a key
+    without complaining, and so would this SDK, so the field it was meant
+    to set stays unset and the plan is optimized without it: a stop with a
+    misspelled `operationDuration` takes no time, an order with a
+    misspelled `requiredSkills` can go on any resource. Raised before the
+    request leaves, since nothing downstream will report it.
+    """
+
+    def __init__(self, paths: List[str]) -> None:
+        listed = "\n".join(f"  {path}" for path in paths)
+        super().__init__(
+            f"Unknown field(s) in the plan — check the spelling:\n{listed}",
+            code="UNKNOWN_FIELD",
+            status=0,
+            request_id=None,
+            retryable=False,
+        )
+        self.paths = paths
+
+
 class KardinalNotFoundError(KardinalError):
     """`NOT_FOUND` (404). Raised on every 404, including reads — no `get_or_none`."""
 

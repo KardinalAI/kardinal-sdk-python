@@ -1,0 +1,105 @@
+"""A misspelled optional field used to vanish without a trace: neither the
+SDK nor the API complains, and the plan is optimized as if the field had
+never been written. These cover keeping such a key and reporting it.
+"""
+
+import pytest
+
+from kardinal import UnknownFieldError
+from kardinal.routing import models
+from kardinal.routing._annotations import unknown_fields, validate_response
+from kardinal.routing.plans import Order, Plan, PlanCreate
+
+_TW = {"begin": "2026-10-01T08:00:00Z", "end": "2026-10-01T18:00:00Z"}
+_RESOURCE = {"id": "r1", "vehicleProfile": {"type": "car"}, "workingTimeWindow": _TW}
+_STOP = {"type": "single", "id": "s1", "position": {"lat": 48.85, "lon": 2.35}}
+
+
+def test_a_clean_plan_reports_nothing() -> None:
+    plan = PlanCreate.model_validate({"resources": [_RESOURCE], "orders": [{"id": "o1", "stops": [_STOP]}]})
+    assert unknown_fields(plan) == []
+
+
+def test_a_misspelled_field_on_a_resource_is_reported() -> None:
+    plan = PlanCreate.model_validate({"resources": [{**_RESOURCE, "maxWorkingDurationn": "PT8H"}]})
+    assert unknown_fields(plan) == ["plan.resources[0].maxWorkingDurationn"]
+
+
+def test_a_misspelled_field_nested_under_a_union_is_reported() -> None:
+    # `stops` and `breaks` hold their items in a RootModel union. A model
+    # compiles its members' validators into itself, so this only works if
+    # every dependant was rebuilt after the members — the case most likely
+    # to regress silently.
+    plan = PlanCreate.model_validate(
+        {
+            "resources": [
+                {
+                    **_RESOURCE,
+                    "breaks": [
+                        {"type": "timeWindowBreak", "duration": "PT45M", "timeWindow": _TW, "oops": 1}
+                    ],
+                }
+            ],
+            "orders": [{"id": "o1", "stops": [{**_STOP, "operationDurationn": "PT5M"}]}],
+        }
+    )
+    assert sorted(unknown_fields(plan)) == [
+        "plan.orders[0].stops[0].operationDurationn",
+        "plan.resources[0].breaks[0].oops",
+    ]
+
+
+def test_every_unknown_field_is_reported_at_once() -> None:
+    plan = PlanCreate.model_validate(
+        {
+            "resources": [{**_RESOURCE, "a": 1}, {**_RESOURCE, "id": "r2", "b": 2}],
+            "orders": [{"id": "o1", "stops": [_STOP]}],
+        }
+    )
+    assert len(unknown_fields(plan)) == 2
+
+
+def test_submit_refuses_to_send_a_plan_with_an_unknown_field() -> None:
+    class _NeverCalled:
+        def request(self, *args, **kwargs):
+            raise AssertionError("submit() sent the plan instead of raising")
+
+    from kardinal.routing.plans import PlansAPI
+
+    plan = PlanCreate.model_validate({"resources": [{**_RESOURCE, "bogus": 1}]})
+    with pytest.raises(UnknownFieldError) as excinfo:
+        PlansAPI(_NeverCalled()).submit(plan)
+    assert excinfo.value.paths == ["plan.resources[0].bogus"]
+    assert "bogus" in str(excinfo.value)
+
+
+def test_a_response_carrying_an_unknown_field_still_parses() -> None:
+    # The same classes read responses. Refusing a key the server added
+    # would break every installed client the day the API gains a field.
+    item = {
+        "id": "4cbd0ab8-282c-4b30-b981-29e1ed8a2016",
+        "resources": [{**_RESOURCE, "fieldAddedByAFutureApi": "x"}],
+        "aPlanLevelFieldAddedLater": 1,
+    }
+    plan = validate_response(Plan, item)
+    assert plan.resources[0].model_extra == {"fieldAddedByAFutureApi": "x"}
+
+
+def test_a_kept_key_round_trips_on_update_instead_of_being_deleted() -> None:
+    # Keeping the key is also what `update()` needs: it replaces the whole
+    # plan, so a field read by `get()` that this SDK version doesn't know
+    # would be deleted server-side if it were dropped on the way back.
+    # `submit()` never reaches serialization — it raises first.
+    item = {
+        "id": "4cbd0ab8-282c-4b30-b981-29e1ed8a2016",
+        "resources": [{**_RESOURCE, "fieldAddedByAFutureApi": "x"}],
+    }
+    plan = validate_response(Plan, item)
+    assert "fieldAddedByAFutureApi" in plan.model_dump_json()
+
+
+def test_the_generated_models_still_build_normally() -> None:
+    resource = models.Resource.model_validate(_RESOURCE)
+    order = Order.model_validate({"id": "o1", "stops": [_STOP]})
+    assert resource.priority == 0
+    assert isinstance(order.stops[0], models.SingleStop)

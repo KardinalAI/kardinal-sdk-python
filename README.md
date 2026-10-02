@@ -193,8 +193,25 @@ KardinalError
 ├── KardinalTimeoutError        solutions.wait()'s hard `timeout` elapsed
 ├── KardinalOptimizationError   solutions.wait() has no solution to return: NO_SOLUTION,
 │                               PLAN_SUPERSEDED, OPTIMIZATION_STALLED (engine crashed)
-└── KardinalConnectionError     DNS/connection/read failure, no HTTP response at all
+├── KardinalConnectionError     DNS/connection/read failure, no HTTP response at all
+└── UnknownFieldError           submit(): a key no model declares, raised before sending
 ```
+
+`UnknownFieldError` is the one raised without a request being made. Most
+plan fields are optional, so a misspelled one used to be dropped in silence
+by the SDK, then by the API: `operationDurationn` left the stop with no
+service time, `requiredSkills` spelled wrong let any resource serve the
+order, and the plan came back valid. `submit()` now lists every such key
+with its path and refuses to send:
+
+```
+Unknown field(s) in the plan — check the spelling:
+  plan.resources[0].maxWorkingDurationn
+  plan.orders[0].stops[0].operationDurationn
+```
+
+Responses are unaffected: a key the API adds is kept, not refused, and
+`update()` sends it back untouched.
 
 All of them are importable from `kardinal` itself
 (`from kardinal import KardinalNotFoundError`), as are `MissingApiKeyError`

@@ -28,11 +28,72 @@ from enum import Enum
 from typing import Any, Iterator, Optional, Type, TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 
 from . import models
 
 _SCALAR_ROOT_TYPES = (str, int, float, bool, UUID, Enum)
+
+
+def _generated_models() -> list[type[BaseModel]]:
+    return [
+        obj
+        for obj in vars(models).values()
+        if isinstance(obj, type)
+        and issubclass(obj, BaseModel)
+        and obj.__module__ == models.__name__
+    ]
+
+
+def _patch_keep_unknown_fields() -> bool:
+    """Generated models default to dropping an unknown key, which makes a
+    misspelled optional field impossible to detect: the value disappears
+    before anything can look at it, the plan is accepted, and the field it
+    was meant to set stays unset. 155 of the 231 fields on the request path
+    are optional, so most of a plan can be silently lost this way.
+
+    Keep those keys instead of dropping them. Nothing is rejected here —
+    `unknown_fields()` reports them, and `submit()`/`update()` raise on what
+    it finds. Responses keep parsing: an unknown key the server adds is
+    retained rather than refused, which is the same tolerance
+    `_patch_lenient_enums` gives enum values.
+
+    Rebuilding is done in several passes on purpose. A model compiles its
+    fields' validators into itself, so a model rebuilt before its members
+    keeps their stale version: `Order` rebuilt before `Stop` would still
+    drop what `Stop` now keeps. Repeating lets the change reach every
+    dependant whatever the declaration order.
+    """
+    plain = [c for c in _generated_models() if not issubclass(c, RootModel)]
+    for cls in plain:
+        cls.model_config["extra"] = "allow"
+    for _ in range(3):
+        for cls in _generated_models():
+            cls.model_rebuild(force=True)
+    return bool(plain)
+
+
+KEEP_UNKNOWN_FIELDS_PATCH_APPLIED = _patch_keep_unknown_fields()
+
+
+def unknown_fields(obj: Any, path: str = "plan") -> list[str]:
+    """Paths of every key no model declared, e.g.
+    `plan.resources[0].maxWorkingDurationn`. Empty when the payload is clean.
+    """
+    found: list[str] = []
+    if isinstance(obj, RootModel):
+        return unknown_fields(obj.root, path)
+    if isinstance(obj, BaseModel):
+        found += [f"{path}.{key}" for key in sorted(obj.model_extra or {})]
+        for name in type(obj).model_fields:
+            found += unknown_fields(getattr(obj, name, None), f"{path}.{name}")
+    elif isinstance(obj, list):
+        for index, item in enumerate(obj):
+            found += unknown_fields(item, f"{path}[{index}]")
+    elif isinstance(obj, dict):
+        for key, value in obj.items():
+            found += unknown_fields(value, f"{path}.{key}")
+    return found
 
 
 def _patch_broken_plan_id() -> bool:
