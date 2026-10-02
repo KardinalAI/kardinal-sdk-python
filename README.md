@@ -213,6 +213,11 @@ Unknown field(s) in the plan — check the spelling:
 Responses are unaffected: a key the API adds is kept, not refused, and
 `update()` sends it back untouched.
 
+`update()` does not check spelling, for that same reason: the plan it sends
+usually came from `get()`, so a key it doesn't recognise is more likely a
+field the API added after this SDK version than a typo, and dropping it
+would delete it on the server.
+
 All of them are importable from `kardinal` itself
 (`from kardinal import KardinalNotFoundError`), as are `MissingApiKeyError`
 and `EmptyApiKeyError` (both `KardinalError`s, raised by `Kardinal()`

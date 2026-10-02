@@ -7,6 +7,7 @@ import respx
 from kardinal._core.errors import KardinalConnectionError, KardinalNotFoundError
 from kardinal._core.transport import DEFAULT_BASE_URL, Transport
 from kardinal.routing import models
+from kardinal.routing._annotations import unknown_fields
 from kardinal.routing.plans import Order, Plan, PlanCreate, PlansAPI
 
 _PLAN_ID = "4cbd0ab8-282c-4b30-b981-29e1ed8a2016"
@@ -303,9 +304,9 @@ def test_an_order_appended_to_a_fetched_plan_is_sent() -> None:
     assert [o["id"] for o in sent["orders"]] == ["o1", "o2"]
 
 
-def test_a_hand_built_order_still_rejects_unknown_fields() -> None:
-    with pytest.raises(ValueError):
-        Order(id="o1", stops=[], typo=True)
+def test_a_hand_built_order_keeps_an_unknown_field_for_submit_to_report() -> None:
+    order = Order(id="o1", stops=[], typo=True)
+    assert unknown_fields(order, "order") == ["order.typo"]
 
 
 @respx.mock

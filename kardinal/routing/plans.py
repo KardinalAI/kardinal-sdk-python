@@ -19,15 +19,19 @@ from . import models
 
 class Order(BaseModel):
     """Same shape as the generated `Order`, but `stops` takes a `SingleStop`
-    or `AlternativesStop` directly, and unknown fields are rejected.
+    or `AlternativesStop` directly.
 
     The generated `Order.stops: List[Stop]` holds each item in a `Stop`
-    RootModel, so reading a stop back takes a `.root` hop; and the generated
-    model silently drops a misspelled field instead of failing. The JSON
-    this produces is identical.
+    RootModel, so reading a stop back takes a `.root` hop. The JSON this
+    produces is identical.
+
+    `extra="allow"` like every other model on the request path: a
+    misspelled key is kept and reported by `submit()` as one
+    `UnknownFieldError` listing every level at once, rather than raising a
+    different exception here than one level down.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     id: models.RegexIdValidation
     properties: Optional[models.Properties] = None
@@ -44,10 +48,14 @@ class PlanCreate(BaseModel):
 
     openapi.yaml has only one `Plan` schema, shared by requests and
     responses — this is `Plan` minus every server-assigned (`readOnly`)
-    field. Sending an `id` is rejected by the API with a 400.
+    field. An `id` sent anyway is ignored by the API, which assigns its own
+    and returns a 201; `submit()` reports it as `plan.id` rather than let a
+    caller believe the id they sent is the plan's.
+
+    `extra="allow"`: see `Order` above.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     properties: Optional[models.Properties] = None
     resources: List[models.Resource]
@@ -96,15 +104,13 @@ class Plan(models.Plan):
       clamped, ...) on the object they already have instead of a separate
       envelope type to unwrap.
 
-    Unlike `Order`/`PlanCreate` (pure request types, `extra="forbid"`),
-    `Plan` and `PlanOrder` are `extra="allow"` on purpose: they're also the
-    types `get()`/`submit()`/`update()` deserialize the server's *response*
-    into. Forbidding unknown fields would make this SDK fail to parse a
-    legitimate response the day the API adds a field this version of the
-    SDK doesn't know about yet; ignoring them would make `update()`, which
-    replaces the whole plan, delete that field on the server. Kept, they're
-    sent back unchanged. Nested generated models (resources, stops) still
-    drop unknown fields.
+    Every model here is `extra="allow"`, request and response alike. On the
+    response side it is what lets this SDK parse a legitimate response the
+    day the API adds a field this version doesn't know, and what lets
+    `update()` — a full replacement — send that field back instead of
+    deleting it server-side. On the request side the key is kept so
+    `submit()` can report it; `update()` does not check, since a key it
+    carries usually came from `get()`.
     """
 
     model_config = ConfigDict(extra="allow")

@@ -53,10 +53,13 @@ def _patch_keep_unknown_fields() -> bool:
     are optional, so most of a plan can be silently lost this way.
 
     Keep those keys instead of dropping them. Nothing is rejected here —
-    `unknown_fields()` reports them, and `submit()`/`update()` raise on what
-    it finds. Responses keep parsing: an unknown key the server adds is
-    retained rather than refused, which is the same tolerance
-    `_patch_lenient_enums` gives enum values.
+    `unknown_fields()` reports them and `submit()` raises on what it finds.
+    `update()` does not check: the plan it sends usually came from `get()`,
+    so an unknown key there is more likely a field the API added after this
+    SDK version than a typo, and it has to be sent back untouched.
+    Responses keep parsing: an unknown key the server adds is retained
+    rather than refused, the same tolerance `_patch_lenient_enums` gives
+    enum values.
 
     Rebuilding is done in several passes on purpose. A model compiles its
     fields' validators into itself, so a model rebuilt before its members

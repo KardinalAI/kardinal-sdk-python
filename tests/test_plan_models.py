@@ -26,15 +26,18 @@ def test_an_empty_plan_is_rejected() -> None:
         PlanCreate.model_validate({})
 
 
-def test_an_unknown_field_is_rejected() -> None:
-    with pytest.raises(ValidationError):
-        PlanCreate.model_validate({"resources": [_RESOURCE], "bogusField": 123})
+def test_an_unknown_plan_level_field_is_reported_like_any_other() -> None:
+    plan = PlanCreate.model_validate({"resources": [_RESOURCE], "bogusField": 123})
+    assert unknown_fields(plan) == ["plan.bogusField"]
 
 
-def test_a_client_supplied_id_is_rejected_like_the_api_would() -> None:
-    # PlanCreate has no `id` field at all: extra="forbid" rejects it.
-    with pytest.raises(ValidationError):
-        PlanCreate.model_validate({"id": "should-not-exist", "resources": [_RESOURCE]})
+def test_a_client_supplied_id_is_reported_rather_than_silently_lost() -> None:
+    # PlanCreate has no `id` field: the server assigns one. Sending an `id`
+    # anyway is not refused by the API — it answers 201 with a different id
+    # — so a caller reusing the one they sent would address a plan that
+    # doesn't exist. Reported here instead.
+    plan = PlanCreate.model_validate({"id": "should-not-exist", "resources": [_RESOURCE]})
+    assert unknown_fields(plan) == ["plan.id"]
 
 
 def test_a_minimal_valid_plan_is_accepted_with_its_defaults() -> None:
