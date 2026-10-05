@@ -3570,3 +3570,6 @@ AtLeastOneConstraintViolation.model_rebuild()
 Plan.model_rebuild()
 Solution.model_rebuild()
 Tour.model_rebuild()
+
+
+from .. import _annotations  # noqa: E402,F401

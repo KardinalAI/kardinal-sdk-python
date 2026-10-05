@@ -54,4 +54,18 @@ lines[i:] = sorted(lines[i:])
 open(path, "w").writelines(lines)
 PY
 
+
+# Make the hand-written patches in _annotations.py impossible to bypass.
+# They were applied by importing plans.py/solutions.py, so a caller who
+# imported the models on their own — to build a payload before touching the
+# client — got the unpatched versions: `PlanId` unparseable, and unknown
+# keys dropped instead of kept, which silently disabled submit()'s spelling
+# check. Importing the models is now enough, whatever the entry point.
+# Appended last so it runs once every class above exists.
+cat >> "$OUTPUT" <<'PY'
+
+
+from .. import _annotations  # noqa: E402,F401
+PY
+
 echo "Generated $OUTPUT"
