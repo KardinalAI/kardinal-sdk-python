@@ -215,7 +215,7 @@ Unknown field(s) in the plan:
 declared field. The plan it sends usually came from `get()`, so an unknown
 key there may be a field the API added after this SDK version — it is sent
 back untouched, since a full replacement would otherwise delete it. A key
-one edit away from a real field is the case that can't be explained that
+within two edits of a real field is the case that can't be explained that
 way.
 
 Responses are never affected: a key the API adds is kept, not refused.

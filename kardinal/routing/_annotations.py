@@ -13,7 +13,6 @@ load them because the CLI imports the models only inside command bodies.
 
 from __future__ import annotations
 
-import difflib
 from contextlib import contextmanager
 from contextvars import ContextVar
 from enum import Enum
@@ -59,12 +58,45 @@ PLAN_READ_ONLY_FIELDS = frozenset(
 )
 
 
+def _edit_budget(a: str, b: str) -> int:
+    """Two edits, but only one on a short name: two edits on a two-letter
+    field is not a typo, it is a different word — `id` would otherwise be
+    offered `tz`.
+    """
+    return 2 if min(len(a), len(b)) >= 5 else 1
+
+
+def _within_edits(a: str, b: str) -> bool:
+    """Levenshtein distance, answered only up to the budget.
+
+    Not `difflib.get_close_matches`: its 0.6 similarity ratio matches names
+    that merely look alike, and `update()` uses this to tell a typo from a
+    field the API added later. `maxDrivingDuration` scores above that ratio
+    against `maxWorkingDuration` while being four edits away — a plausible
+    future field that would warn on every call.
+    """
+    limit = _edit_budget(a, b)
+    if abs(len(a) - len(b)) > limit:
+        return False
+    previous = list(range(len(b) + 1))
+    for i, ca in enumerate(a, start=1):
+        current = [i]
+        for j, cb in enumerate(b, start=1):
+            current.append(
+                previous[j - 1] if ca == cb else 1 + min(previous[j - 1], previous[j], current[j - 1])
+            )
+        if min(current) > limit:
+            return False
+        previous = current
+    return previous[-1] <= limit
+
+
 class UnknownField(NamedTuple):
     """A key no model declared, and what it was most likely meant to be.
 
-    `suggestion` is a declared field of the same model one or two edits
+    `suggestion` is a declared field of the same model at most two edits
     away — strong evidence of a typo, as opposed to a key the API may have
-    added after this SDK version, which resembles nothing.
+    added after this SDK version, which resembles nothing that closely.
     """
 
     path: str
@@ -83,18 +115,23 @@ class UnknownField(NamedTuple):
 
 
 def _describe(key: str, owner: type[BaseModel], path: str) -> UnknownField:
-    close = difflib.get_close_matches(key, owner.model_fields, n=1)
+    near = sorted(
+        (f for f in owner.model_fields if _within_edits(key, f)),
+        key=lambda f: (len(f) != len(key), f),
+    )
     return UnknownField(
         path=path,
-        suggestion=close[0] if close else None,
-        server_assigned=key in PLAN_READ_ONLY_FIELDS,
+        suggestion=near[0] if near else None,
+        # Only at the top level: these names are the plan's. An unknown
+        # `version` on an order is not something the server assigns.
+        server_assigned=key in PLAN_READ_ONLY_FIELDS and path.count(".") == 1,
     )
 
 
 def unknown_fields(obj: Any, path: str = "plan") -> list[UnknownField]:
     """Every key no model declared, with its path — e.g.
     `plan.resources[0].maxWorkingDurationn` — and a hint when the name is
-    one edit away from a real field. Empty when the payload is clean.
+    at most two edits from a real field. Empty when the payload is clean.
     """
     found: list[UnknownField] = []
     if isinstance(obj, RootModel):

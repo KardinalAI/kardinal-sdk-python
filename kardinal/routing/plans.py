@@ -177,7 +177,7 @@ class PlansAPI:
         here usually came from `get()`, so an unknown key is as likely to be
         a field the API added after this SDK version — which must be sent
         back untouched, or the full replacement deletes it server-side. Only
-        a key one edit away from a declared field is reported, since that
+        a key within two edits of a declared field is reported, since that
         resemblance is what a future API field wouldn't have.
         """
         likely_typos = [f for f in _annotations.unknown_fields(plan) if f.suggestion]

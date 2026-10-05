@@ -139,3 +139,39 @@ def test_a_server_assigned_key_is_not_reported_as_a_spelling_mistake() -> None:
     assert field.suggestion is None
     assert field.server_assigned
     assert "server assigns it" in str(field)
+
+
+def test_a_plausible_future_api_field_gets_no_suggestion() -> None:
+    # The reason this uses edit distance and not difflib's similarity
+    # ratio: `maxDrivingDuration` scores above 0.6 against
+    # `maxWorkingDuration` while being four edits away, so `update()` would
+    # have warned on every call once the API grew such a field.
+    from kardinal.routing._annotations import _describe
+
+    for plausible in ("maxDrivingDuration", "maxLoadingDuration", "maxRestDuration"):
+        field = _describe(plausible, models.Resource, f"plan.resources[0].{plausible}")
+        assert field.suggestion is None, plausible
+
+
+def test_a_real_typo_still_gets_its_suggestion() -> None:
+    from kardinal.routing._annotations import _describe
+
+    for typo in ("maxWorkingDurationn", "maxworkingduration", "MaxWorkingDuration"):
+        field = _describe(typo, models.Resource, f"plan.resources[0].{typo}")
+        assert field.suggestion == "maxWorkingDuration", typo
+
+
+def test_server_assigned_only_applies_to_the_plan_itself() -> None:
+    from kardinal.routing._annotations import _describe
+
+    assert _describe("version", models.Plan, "plan.version").server_assigned
+    # An order has no server-assigned `version`; claiming otherwise would
+    # send the caller looking for something that doesn't exist.
+    assert not _describe("version", models.Order, "plan.orders[0].version").server_assigned
+
+
+def test_a_short_name_is_not_matched_to_an_unrelated_short_field() -> None:
+    # Two edits on a two-letter name is a different word, not a typo.
+    from kardinal.routing._annotations import _describe
+
+    assert _describe("id", PlanCreate, "plan.id").suggestion is None
