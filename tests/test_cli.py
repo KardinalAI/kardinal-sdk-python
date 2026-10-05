@@ -61,6 +61,18 @@ def test_validate_accepts_example_plan(tmp_path) -> None:
     assert "OK" in result.stdout
 
 
+def test_validate_reports_what_submit_would_refuse(tmp_path) -> None:
+    # Answering OK here while submit() refuses the same file is worse than
+    # not checking at all: it tells the caller the plan is good.
+    plan = json.loads(small_delivery_plan().model_dump_json(exclude_none=True))
+    plan["resources"][0]["maxWorkingDurationn"] = "PT8H"
+    bad = tmp_path / "typo.json"
+    bad.write_text(json.dumps(plan))
+    result = runner.invoke(app, ["routing", "plans", "validate", str(bad)])
+    assert result.exit_code == 1
+    assert "plan.resources[0].maxWorkingDurationn" in result.stdout
+
+
 @respx.mock
 def test_submit_json_output(tmp_path) -> None:
     respx.post(f"{DEFAULT_BASE_URL}/plans").mock(

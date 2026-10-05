@@ -187,14 +187,25 @@ def plans_validate(
     """Validate a plan locally. No API call, no credits consumed."""
     from .plans import PlanCreate
 
+    from ._annotations import unknown_fields
+
     try:
-        PlanCreate.model_validate_json(file.read_text())
+        plan = PlanCreate.model_validate_json(file.read_text())
     except ValidationError as exc:
         emit(
             [
                 {"field": ".".join(map(str, e["loc"])), "error": e["msg"]}
                 for e in exc.errors()
             ],
+            force_json=True,
+        )
+        raise typer.Exit(Exit.BUSINESS_ERROR)
+    # Same checks as submit(), or this command would answer OK to a plan
+    # submit() goes on to refuse.
+    unknown = unknown_fields(plan)
+    if unknown:
+        emit(
+            [{"field": path, "error": "unknown field — check the spelling"} for path in unknown],
             force_json=True,
         )
         raise typer.Exit(Exit.BUSINESS_ERROR)
