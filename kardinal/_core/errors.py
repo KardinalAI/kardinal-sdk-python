@@ -26,7 +26,7 @@ carries no envelope.
 
 from __future__ import annotations
 
-from typing import List, Optional, Type
+from typing import Any, List, Optional, Sequence, Type
 
 
 class KardinalError(Exception):
@@ -102,16 +102,17 @@ class UnknownFieldError(KardinalError):
     request leaves, since nothing downstream will report it.
     """
 
-    def __init__(self, paths: List[str]) -> None:
-        listed = "\n".join(f"  {path}" for path in paths)
+    def __init__(self, fields: Sequence[Any]) -> None:
+        listed = "\n".join(f"  {field}" for field in fields)
         super().__init__(
-            f"Unknown field(s) in the plan — check the spelling:\n{listed}",
+            f"Unknown field(s) in the plan:\n{listed}",
             code="UNKNOWN_FIELD",
             status=0,
             request_id=None,
             retryable=False,
         )
-        self.paths = paths
+        self.fields = list(fields)
+        self.paths = [getattr(f, "path", str(f)) for f in fields]
 
 
 class KardinalNotFoundError(KardinalError):

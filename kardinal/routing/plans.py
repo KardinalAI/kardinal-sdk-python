@@ -5,6 +5,8 @@ the single generated `Plan` schema can't provide on its own.
 
 from __future__ import annotations
 
+import warnings
+
 from typing import Any, Dict, Iterator, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict
@@ -13,6 +15,10 @@ from .._core.errors import UnknownFieldError
 from .._core.pagination import Page, iter_all as _iter_all
 from .._core.transport import Transport
 from . import _annotations  # import side effect: patches models.PlanId
+# PLAN_READ_ONLY_FIELDS: server-computed fields update() must not echo
+# back on PUT. It lives in _annotations.py because the message for an
+# unknown key needs it too, to say "the server assigns it".
+from ._annotations import PLAN_READ_ONLY_FIELDS as _PLAN_READ_ONLY_FIELDS
 from ._annotations import validate_response
 from . import models
 
@@ -109,8 +115,8 @@ class Plan(models.Plan):
     day the API adds a field this version doesn't know, and what lets
     `update()` — a full replacement — send that field back instead of
     deleting it server-side. On the request side the key is kept so
-    `submit()` can report it; `update()` does not check, since a key it
-    carries usually came from `get()`.
+    `submit()` can report it; `update()` only warns, and only for a key
+    that resembles a declared one (see `update`).
     """
 
     model_config = ConfigDict(extra="allow")
@@ -119,30 +125,6 @@ class Plan(models.Plan):
     id: str  # type: ignore[assignment]
     orders: Optional[List[PlanOrder]] = None  # type: ignore[assignment]
     warnings: List[models.Warning] = []
-
-
-# Server-computed fields update() must not echo back on PUT — POST already
-# actively rejects an unexpected `id`, so nothing guarantees a future PUT
-# stays lenient about these just because it is today. `id` included: it's
-# `readOnly` in the spec and travels in the URL; today's PUT only tolerates
-# a body `id` that matches the URL.
-_PLAN_READ_ONLY_FIELDS = frozenset(
-    {
-        "id",
-        "agencyId",
-        "version",
-        "running",
-        "status",
-        "state",
-        "nbResources",
-        "nbOrders",
-        "createdAt",
-        "createdBy",
-        "updatedAt",
-        "updatedBy",
-        "archivedAt",
-    }
-)
 
 
 def _plan_from_envelope(response: Dict[str, Any]) -> Plan:
@@ -190,7 +172,18 @@ class PlansAPI:
         stops are billed.
 
         `force` unarchives the plan first if it's archived; ignored otherwise.
+
+        Warns, rather than raises, on a key that looks like a typo. A plan
+        here usually came from `get()`, so an unknown key is as likely to be
+        a field the API added after this SDK version — which must be sent
+        back untouched, or the full replacement deletes it server-side. Only
+        a key one edit away from a declared field is reported, since that
+        resemblance is what a future API field wouldn't have.
         """
+        likely_typos = [f for f in _annotations.unknown_fields(plan) if f.suggestion]
+        if likely_typos:
+            listed = ", ".join(str(f) for f in likely_typos)
+            warnings.warn(f"Possible typo(s) in the plan being sent: {listed}", stacklevel=2)
         # `warnings` is this SDK's own field (see `Plan`), not the plan's.
         body = plan.model_dump(
             mode="json", exclude_none=True, exclude=set(_PLAN_READ_ONLY_FIELDS | {"warnings"})

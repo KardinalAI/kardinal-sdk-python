@@ -13,6 +13,7 @@ python3 -m datamodel_code_generator \
   --input spec/openapi.yaml --input-file-type openapi \
   --output-model-type pydantic_v2.BaseModel \
   --use-schema-description \
+  --extra-fields=allow \
   --field-constraints \
   --disable-timestamp \
   --output "$OUTPUT"

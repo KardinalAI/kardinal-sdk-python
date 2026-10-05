@@ -205,18 +205,20 @@ order, and the plan came back valid. `submit()` now lists every such key
 with its path and refuses to send:
 
 ```
-Unknown field(s) in the plan — check the spelling:
-  plan.resources[0].maxWorkingDurationn
-  plan.orders[0].stops[0].operationDurationn
+Unknown field(s) in the plan:
+  plan.id                                     (not a field you set: the server assigns it)
+  plan.resources[0].maxWorkingDurationn       (did you mean maxWorkingDuration?)
+  plan.orders[0].stops[0].operationDurationn  (did you mean operationDuration?)
 ```
 
-Responses are unaffected: a key the API adds is kept, not refused, and
-`update()` sends it back untouched.
+`update()` warns instead of raising, and only for a key that resembles a
+declared field. The plan it sends usually came from `get()`, so an unknown
+key there may be a field the API added after this SDK version — it is sent
+back untouched, since a full replacement would otherwise delete it. A key
+one edit away from a real field is the case that can't be explained that
+way.
 
-`update()` does not check spelling, for that same reason: the plan it sends
-usually came from `get()`, so a key it doesn't recognise is more likely a
-field the API added after this SDK version than a typo, and dropping it
-would delete it on the server.
+Responses are never affected: a key the API adds is kept, not refused.
 
 All of them are importable from `kardinal` itself
 (`from kardinal import KardinalNotFoundError`), as are `MissingApiKeyError`

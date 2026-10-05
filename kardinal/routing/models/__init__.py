@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Dict, List, Literal, Optional, Union
 from uuid import UUID
 
-from pydantic import AnyUrl, BaseModel, Field, RootModel
+from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel
 
 
 class RegexIdValidation(RootModel[str]):
@@ -23,6 +23,9 @@ class ForbiddenAssignment(BaseModel):
     Forbidden assignment by stop tag and resource tag.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     resourceTag: RegexIdValidation = Field(
         ..., description='Resource tag.', examples=['trailer']
     )
@@ -96,6 +99,9 @@ class PlanStatusVersion(BaseModel):
     Which plan version is waiting to enter a given pipeline stage versus already running through it.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     waitingVersion: Optional[PlanVersion] = Field(
         None, description='The version currently waiting.'
     )
@@ -119,6 +125,9 @@ class MaxInterStopDistanceInKmBounds(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     firstTravel: Optional[float] = Field(
         None,
         description="Maximum distance, in km, between the resource's departure and the first stop.",
@@ -230,6 +239,9 @@ class StopTagPrecedencePair(BaseModel):
     A pair of precedence stop tags.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     previous: RegexIdValidation = Field(
         ...,
         description='Stop tag that must be visited before any stop tagged `next`.',
@@ -256,6 +268,9 @@ class MaximizePrecedencesObjective(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Type3 = Field(
         ...,
         description='Discriminator identifying this objective as `maximizePrecedences`.',
@@ -275,6 +290,9 @@ class CostRange(BaseModel):
     A range of cost values (min equals max when the cost is a fixed value).
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     min: float = Field(..., description='The minimum cost', examples=[42.15])
     max: float = Field(..., description='The maximum cost', examples=[58.6])
 
@@ -338,6 +356,9 @@ class Position(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     lon: float = Field(
         ..., description='Longitude, in decimal degrees.', ge=-180.0, le=180.0
     )
@@ -351,6 +372,9 @@ class FromPrevious(BaseModel):
     The travel distance and duration from the previous waypoint to the current one.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     travelDistanceInKm: float = Field(
         ...,
         description='Distance travelled from the previous waypoint, in kilometres.',
@@ -389,6 +413,9 @@ class TaggedTimeWindow(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     begin: DateTime = Field(..., description='Start of the window.')
     end: DateTime = Field(..., description='End of the window.')
     resourceTags: Optional[List[RegexIdValidation]] = Field(
@@ -404,6 +431,9 @@ class TimeWindow(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     begin: DateTime = Field(..., description='Start of the window.')
     end: DateTime = Field(..., description='End of the window.')
 
@@ -422,6 +452,9 @@ class TimeWindowBreak(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['timeWindowBreak'] = Field(
         ..., description='Discriminator identifying this break as `timeWindowBreak`.'
     )
@@ -448,6 +481,9 @@ class TravelDurationSlidingBreak(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['travelDurationSlidingBreak'] = Field(
         ...,
         description='Discriminator identifying this break as `travelDurationSlidingBreak`.',
@@ -470,6 +506,9 @@ class WorkingDurationSlidingBreak(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['workingDurationSlidingBreak'] = Field(
         ...,
         description='Discriminator identifying this break as `workingDurationSlidingBreak`.',
@@ -483,6 +522,9 @@ class AvoidEarlyLoading(BaseModel):
     Declares a stop tag and optional capacities for early loading computation.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     stopTag: RegexIdValidation = Field(
         ...,
         description='The stop tag identifying stops where early loading should be avoided.',
@@ -509,6 +551,9 @@ class OperationDurationPolicy(BaseModel):
     Policy to indicate which operation duration must not be taken into account.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     policy: Policy = Field(
         ...,
         description="Which operation duration to leave out of the schedule: `withoutFirstOperationDuration` ignores only the first matching stop's operation duration, `withoutOperationDurations` ignores it on every matching stop.\n",
@@ -556,6 +601,9 @@ class VehicleProfileFly(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['fly'] = Field(
         ..., description='Discriminator identifying this vehicle profile as `fly`.'
     )
@@ -579,6 +627,9 @@ class VehicleProfilePedestrian(BaseModel):
     Road-network routing for the pedestrian mode.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['pedestrian'] = Field(
         ...,
         description='Discriminator identifying this vehicle profile as `pedestrian`.',
@@ -610,6 +661,9 @@ class VehicleProfileBicycle(BaseModel):
     Road-network routing for the bicycle mode.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['bicycle'] = Field(
         ..., description='Discriminator identifying this vehicle profile as `bicycle`.'
     )
@@ -643,6 +697,9 @@ class VehicleProfileScooter(BaseModel):
     Road-network routing for the scooter mode.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['scooter'] = Field(
         ..., description='Discriminator identifying this vehicle profile as `scooter`.'
     )
@@ -684,6 +741,9 @@ class VehicleProfileMotorbike(BaseModel):
     Road-network routing for the motorbike mode.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['motorbike'] = Field(
         ...,
         description='Discriminator identifying this vehicle profile as `motorbike`.',
@@ -730,6 +790,9 @@ class VehicleProfileCar(BaseModel):
     Road-network routing for the car mode.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['car'] = Field(
         ..., description='Discriminator identifying this vehicle profile as `car`.'
     )
@@ -836,6 +899,9 @@ class CostFloorsAndCoeffs(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     constantCost: Optional[float] = Field(
         None,
         description='Fixed cost added regardless of usage, in currency unit.',
@@ -894,6 +960,9 @@ class AssignmentStop(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['stop'] = Field(
         ..., description='Discriminator identifying this waypoint as a stop.'
     )
@@ -926,6 +995,9 @@ class AssignmentBegin(BaseModel):
     Pins the start of a resource's tour to a fixed departure time.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['begin'] = Field(
         ..., description="Discriminator identifying this waypoint as the tour's begin."
     )
@@ -946,6 +1018,9 @@ class AssignmentBreak(BaseModel):
     Pins a break onto a resource's tour.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['break'] = Field(
         ..., description='Discriminator identifying this waypoint as a break.'
     )
@@ -967,6 +1042,9 @@ class AssignmentEnd(BaseModel):
     Pins the end of a resource's tour to a fixed arrival time.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['end'] = Field(
         ..., description="Discriminator identifying this waypoint as the tour's end."
     )
@@ -1036,6 +1114,9 @@ class Error(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     code: Code = Field(
         ...,
         description="Stable identifier for the error type. Branch your error handling on this field, not on the HTTP status alone or on this response's `description` in this spec. Several `code` values can share the same status. See the preceding table.\n",
@@ -1059,6 +1140,10 @@ class Warning(Error):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
+
 
 class Direction1(RootModel[OptimizationDirection]):
     """
@@ -1073,6 +1158,9 @@ class SolutionObjective(BaseModel):
     Achieved value of one objective from `Plan.objectives`.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     name: Optional[RegexIdValidation] = Field(
         None,
         description="Objective name, matching an `ObjectivesEnum` value or a `CustomObjective`'s `name`.",
@@ -1111,6 +1199,9 @@ class GlobalViolationMaxCumulatedCost(BaseModel):
     Violation of a `GlobalConstraintMaxCumulatedCost` constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Optional[Type19] = Field(
         None,
         description='Discriminator identifying this violation as `maxCumulatedCost`.',
@@ -1150,6 +1241,9 @@ class BeginViolation(BaseModel):
     Violation of a resource's departure position constraint at the beginning of a tour.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['begin'] = Field(..., description="The violation's type.")
     wayPointIndex: Optional[int] = Field(
         None,
@@ -1171,6 +1265,9 @@ class EndViolation(BaseModel):
     Violation of a resource's arrival position constraint at the end of a tour.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['end'] = Field(
         ..., description='Discriminator identifying this violation as `end`.'
     )
@@ -1197,6 +1294,9 @@ class SkillsViolation(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['skills'] = Field(
         ..., description='Discriminator identifying this violation as `skills`.'
     )
@@ -1225,6 +1325,9 @@ class ForbiddenAssignmentViolation(BaseModel):
     Violation of a ForbiddenAssignment constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['forbiddenAssignment'] = Field(
         ...,
         description='Discriminator identifying this violation as `forbiddenAssignment`.',
@@ -1256,6 +1359,9 @@ class AuthorizedTimeWindowViolation(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['authorizedTimeWindow'] = Field(
         ...,
         description='Discriminator identifying this violation as `authorizedTimeWindow`.',
@@ -1293,6 +1399,9 @@ class CapacityViolation(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['capacity'] = Field(
         ..., description='Discriminator identifying this violation as `capacity`.'
     )
@@ -1322,6 +1431,9 @@ class AtLeastOneValidCapacityViolation(BaseModel):
     Violation of an AtLeastOneValidCapacity constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['atLeastOneValidCapacity'] = Field(
         ...,
         description='Discriminator identifying this violation as `atLeastOneValidCapacity`.',
@@ -1352,6 +1464,9 @@ class SuccessiveStopsViolation(BaseModel):
     Violation of an order's successive-stops constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['successiveStops'] = Field(
         ...,
         description='Discriminator identifying this violation as `successiveStops`.',
@@ -1381,6 +1496,9 @@ class OrderViolation(BaseModel):
     Violation of an order's stop-sequence constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['order'] = Field(
         ..., description='Discriminator identifying this violation as `order`.'
     )
@@ -1412,6 +1530,9 @@ class MaxStopSpanViolation(BaseModel):
     Violation of an order's MaxStopSpan constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['maxStopSpan'] = Field(
         ..., description='Discriminator identifying this violation as `maxStopSpan`.'
     )
@@ -1436,6 +1557,9 @@ class WorkingTimeWindowViolation(BaseModel):
     Violation of a resource's TimeWindow constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['workingTimeWindow'] = Field(
         ...,
         description='Discriminator identifying this violation as `workingTimeWindow`.',
@@ -1461,6 +1585,9 @@ class MaxWorkingDurationViolation(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['maxWorkingDuration'] = Field(
         ...,
         description='Discriminator identifying this violation as `maxWorkingDuration`.',
@@ -1486,6 +1613,9 @@ class MaxDistanceInKmViolation(BaseModel):
     Violation of a resource's MaxDistanceInKm constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['maxDistanceInKm'] = Field(
         ...,
         description='Discriminator identifying this violation as `maxDistanceInKm`.',
@@ -1513,6 +1643,9 @@ class MaxInterStopDistanceInKmViolation(BaseModel):
     Violation of a resource's MaxInterStopDistanceInKm constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['maxInterStopDistanceInKm'] = Field(
         ...,
         description='Discriminator identifying this violation as `maxInterStopDistanceInKm`.',
@@ -1547,6 +1680,9 @@ class MaxInterStopDurationViolation(BaseModel):
     Violation of a resource's MaxInterStopDuration constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['maxInterStopDuration'] = Field(
         ...,
         description='Discriminator identifying this violation as `maxInterStopDuration`.',
@@ -1581,6 +1717,9 @@ class StopIncompatibilityViolation(BaseModel):
     Violation of a resource's StopIncompatibility constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['stopIncompatibility'] = Field(
         ...,
         description='Discriminator identifying this violation as `stopIncompatibility`.',
@@ -1617,6 +1756,9 @@ class ExceededNbGroups(BaseModel):
     The maximum number of groups and its corresponding exceeding number of groups, for a stop tag.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     maxAllowed: int = Field(
         ..., description='Maximum number of groups allowed.', examples=[2], ge=0
     )
@@ -1705,6 +1847,9 @@ class AdditionalConstraintIncompatibleStopTags(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['incompatibleStopTags'] = Field(
         ...,
         description='Discriminator identifying this constraint as `incompatibleStopTags`.',
@@ -1736,6 +1881,9 @@ class AdditionalConstraintForbiddenAssignment(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['forbiddenAssignment'] = Field(
         ...,
         description='Discriminator identifying this constraint as `forbiddenAssignment`.',
@@ -1767,6 +1915,9 @@ class AdditionalConstraintAtLeastOneValidCapacity(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['atLeastOneValidCapacity'] = Field(
         ...,
         description='Discriminator identifying this constraint as `atLeastOneValidCapacity`.',
@@ -1809,6 +1960,9 @@ class AdditionalConstraintCapacities(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['capacities'] = Field(
         ..., description='Discriminator identifying this constraint as `capacities`.'
     )
@@ -1862,6 +2016,9 @@ class AdditionalConstraintRemovalStrategy(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['removalStrategy'] = Field(
         ...,
         description='Discriminator identifying this constraint as `removalStrategy`.',
@@ -1889,6 +2046,9 @@ class Paging(BaseModel):
     Pagination metadata attached to a paged list response.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     total: Optional[int] = Field(
         None,
         description='The total number of items in the requested collection.',
@@ -1934,6 +2094,9 @@ class WebhookCreate(BaseModel):
     Payload to register a new webhook on a plan.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     url: AnyUrl = Field(
         ...,
         description='The secure webhook URL (must be https).',
@@ -1964,6 +2127,9 @@ class WebhookUpdate(BaseModel):
     Payload to update an existing webhook registration.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     url: AnyUrl = Field(
         ...,
         description='The secure webhook URL (must be https).',
@@ -1993,6 +2159,9 @@ class AdditionalOperationDuration(BaseModel):
     Additional operation duration by stop tag and resource tag.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     resourceTag: RegexIdValidation = Field(
         ..., description='Resource tag.', examples=['trailer']
     )
@@ -2007,6 +2176,10 @@ class PlanId(BaseModel):
     """
     The plan id.
     """
+
+    model_config = ConfigDict(
+        extra='allow',
+    )
 
 
 class State(RootModel[PlanState]):
@@ -2023,6 +2196,9 @@ class EnvelopedPlanReference(BaseModel):
     An envelope carrying no item, only the reference of the plan the request acted on.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     agencyId: Optional[AgencyId] = None
     planId: Optional[PlanId] = None
     planVersion: Optional[PlanVersion] = Field(
@@ -2038,6 +2214,9 @@ class TimedPlanState(BaseModel):
     A snapshot of a plan's `PlanState` at a given point in time, one entry in its state history.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     planVersion: Optional[PlanVersion] = Field(
         None, description="The corresponding plan's version.", examples=[2]
     )
@@ -2054,6 +2233,9 @@ class EnvelopedTimedPlanState(BaseModel):
     A single plan state-history entry wrapped with its identifying metadata.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     item: Optional[TimedPlanState] = Field(
         None, description='The state-history entry itself.'
     )
@@ -2066,6 +2248,9 @@ class PlanStatus(BaseModel):
     Fine-grained progress of the plan through the optimization pipeline, broken down by stage.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     planVersionInSolution: Optional[PlanVersion] = Field(
         None, description='The plan version taken into account in the current solution.'
     )
@@ -2091,6 +2276,9 @@ class MaxInterStopDurationBounds(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     firstTravel: Optional[Duration] = Field(
         None,
         description="Maximum duration between the resource's departure and the first stop.",
@@ -2111,6 +2299,9 @@ class SingleStop(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['single'] = Field(
         ...,
         description='Always set this explicitly (`"type": "single"`), even though it defaults and a bare stop object is accepted as-is: a discriminated-union validator re-parsing your own payload (for example a typed SDK confirming it round-trips) needs the tag present in the data itself to pick the right variant, and rejects an object missing it even when the field has a documented default.\n',
@@ -2158,6 +2349,9 @@ class AlternativesStop(BaseModel):
     A stop composed of different alternative single stops.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     id: RegexIdValidation = Field(
         ...,
         description='Alternatives-group ids must be unique within a plan.',
@@ -2178,6 +2372,9 @@ class SetupDuration(BaseModel):
     Extra changeover duration inserted when a resource travels directly from a stop tagged `fromStopTag` to a stop tagged `toStopTag`.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     fromStopTag: RegexIdValidation = Field(
         ...,
         description='Tag of the stop the resource is leaving.',
@@ -2230,6 +2427,9 @@ class VehicleProfileTruck(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['truck'] = Field(
         ..., description='Discriminator identifying this vehicle profile as `truck`.'
     )
@@ -2303,6 +2503,9 @@ class TaggedCostFloorsAndCoeffs(CostFloorsAndCoeffs):
     Cost floor and coefficient (see `CostFloorsAndCoeffs`), further scoped to the stop tags listed in `stopTags`.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     stopTags: Optional[List[RegexIdValidation]] = Field(
         None,
         description='Stop tags this cost applies to.\n\n> **Default.** If empty or omitted, the cost applies regardless of stop tag.\n',
@@ -2318,6 +2521,9 @@ class Cost(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     workedHours: Optional[CostFloorsAndCoeffs] = Field(
         None,
         description='Cost proportional to worked hours, in currency unit per hour.',
@@ -2367,6 +2573,9 @@ class StateModel(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     mode: Optional[Mode] = None
     assignments: Optional[List[Assignments]] = Field(
         None,
@@ -2379,6 +2588,9 @@ class EnvelopedErrors(BaseModel):
     Envelope wrapping one or more business errors, returned on every error response regardless of HTTP status, except a `429` temporary overload, which comes with an empty body.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     agencyId: Optional[AgencyId] = Field(
         None,
         description="The agency the failed action was scoped to.\n\n> **Default.** Absent when the action isn't tied to any agency at all — for example a `401` `NOT_AUTHENTICATED` response, returned before any agency could be resolved from the token.\n",
@@ -2406,6 +2618,9 @@ class EnvelopedSolutionObjectives(BaseModel):
     A page of achieved objective values, as returned by the objectives-listing endpoint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     items: Optional[List[SolutionObjective]] = Field(
         None, description='Achieved objective values.'
     )
@@ -2454,6 +2669,9 @@ class MaxStopTagGroupsViolation(BaseModel):
     Violation of a resource's MaxStopTagGroups constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['maxStopTagGroups'] = Field(
         ...,
         description='Discriminator identifying this violation as `maxStopTagGroups`.',
@@ -2475,6 +2693,9 @@ class RemovalStrategyViolation(BaseModel):
     Violation of a resource's RemovalStrategy constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['removalStrategy'] = Field(
         ...,
         description='Discriminator identifying this violation as `removalStrategy`.',
@@ -2492,6 +2713,9 @@ class WayPointBegin(BaseModel):
     The start of a tour, where the resource departs from.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['begin'] = Field(
         ..., description="Discriminator identifying this waypoint as the tour's begin."
     )
@@ -2513,6 +2737,9 @@ class WayPointStop(BaseModel):
     A single stop visited on a tour.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['stop'] = Field(
         ..., description='Discriminator identifying this waypoint as a stop.'
     )
@@ -2559,6 +2786,9 @@ class WayPointBreak(BaseModel):
     A resource break taken during a tour.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['break'] = Field(
         ..., description='Discriminator identifying this waypoint as a break.'
     )
@@ -2576,6 +2806,9 @@ class WayPointEnd(BaseModel):
     The end of a tour, where the resource finishes.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['end'] = Field(
         ..., description="Discriminator identifying this waypoint as the tour's end."
     )
@@ -2600,6 +2833,9 @@ class AdditionalConstraintMaxStopTagGroups(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['maxStopTagGroups'] = Field(
         ...,
         description='Discriminator identifying this constraint as `maxStopTagGroups`.',
@@ -2624,6 +2860,9 @@ class PlanWebhook(BaseModel):
     A webhook registered on a plan, notified on the events it subscribes to.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     id: Optional[UUIDModel] = Field(
         None, description='Id of this webhook registration.'
     )
@@ -2667,6 +2906,9 @@ class EnvelopedPlanWebhook(BaseModel):
     A single webhook registration wrapped with its identifying metadata.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     item: Optional[PlanWebhook] = Field(
         None, description='The webhook registration itself.'
     )
@@ -2679,6 +2921,9 @@ class EnvelopedPlanWebhooks(BaseModel):
     The full list of webhook registrations, as returned by the webhook-listing endpoint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     items: Optional[List[PlanWebhook]] = Field(
         None, description='Webhooks registered on this plan.'
     )
@@ -2691,6 +2936,9 @@ class PlanWebhookResult(BaseModel):
     Record of one delivery attempt of a webhook call.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     webhookId: Optional[UUIDModel] = Field(
         None, description='Id of the webhook this delivery attempt belongs to.'
     )
@@ -2724,6 +2972,9 @@ class EnvelopedPlanWebhookResults(BaseModel):
     The full list of webhook delivery attempts, as returned by the webhook-results-listing endpoint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     items: Optional[List[PlanWebhookResult]] = Field(
         None, description="Delivery attempts for this plan's webhooks."
     )
@@ -2736,6 +2987,9 @@ class PlanLight(BaseModel):
     A plan in a light representation (without resources, orders, constraints, and so on).
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     id: Optional[PlanId] = None
     agencyId: Optional[AgencyId] = None
     version: Optional[PlanVersion] = None
@@ -2782,6 +3036,9 @@ class EnvelopedPlansLight(BaseModel):
     A page of light-representation plans, as returned by the plan-listing endpoint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     items: Optional[List[PlanLight]] = Field(None, description='Plans on this page.')
     agencyId: Optional[AgencyId] = None
     paging: Optional[Paging] = None
@@ -2795,6 +3052,9 @@ class Resource(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     id: RegexIdValidation = Field(
         ...,
         description='Resource ids must be unique within a plan.',
@@ -2927,6 +3187,9 @@ class Order(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     id: RegexIdValidation = Field(
         ..., description='Order ids must be unique within a plan.', examples=['order1']
     )
@@ -2974,6 +3237,9 @@ class CustomObjective(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Type4 = Field(
         ..., description='Discriminator identifying this objective as `custom`.'
     )
@@ -3006,6 +3272,9 @@ class GlobalConstraintMaxCumulatedCost(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Type2 = Field(
         ...,
         description='Discriminator identifying this constraint as `maxCumulatedCost`.',
@@ -3056,6 +3325,9 @@ class Plan(BaseModel):
     A full plan for a date and agency, with its associated resources, orders, constraints, and so on.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     id: Optional[PlanId] = None
     agencyId: Optional[AgencyId] = None
     version: Optional[PlanVersion] = None
@@ -3201,6 +3473,9 @@ class EnvelopedPlan(BaseModel):
     A single plan wrapped with its identifying metadata, as returned by the plan-retrieval endpoints.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     item: Optional[Plan] = Field(None, description='The plan itself.')
     agencyId: Optional[AgencyId] = None
     planId: Optional[PlanId] = None
@@ -3218,6 +3493,9 @@ class Solution(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     agencyId: Optional[AgencyId] = None
     planId: Optional[PlanId] = None
     planVersion: Optional[PlanVersion] = None
@@ -3321,6 +3599,9 @@ class EnvelopedSolution(BaseModel):
     A single solution wrapped with its identifying metadata, as returned by the solution-retrieval endpoint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     item: Optional[Solution] = Field(None, description='The solution itself.')
     agencyId: Optional[AgencyId] = None
     planId: Optional[PlanId] = None
@@ -3336,6 +3617,9 @@ class Tour(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     resourceId: Optional[RegexIdValidation] = Field(
         None,
         description='Id of the resource this tour was built for.',
@@ -3430,6 +3714,9 @@ class AtLeastOneConstraintViolation(BaseModel):
     Violation of a resource's AtLeastOneConstraint constraint.
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['atLeastOneConstraint'] = Field(
         ...,
         description='Discriminator identifying this violation as `atLeastOneConstraint`.',
@@ -3450,6 +3737,9 @@ class AdditionalConstraintAtLeastOneConstraint(BaseModel):
 
     """
 
+    model_config = ConfigDict(
+        extra='allow',
+    )
     type: Literal['atLeastOneConstraint'] = Field(
         ...,
         description='Discriminator identifying this constraint as `atLeastOneConstraint`.',

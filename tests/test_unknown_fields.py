@@ -17,12 +17,12 @@ _STOP = {"type": "single", "id": "s1", "position": {"lat": 48.85, "lon": 2.35}}
 
 def test_a_clean_plan_reports_nothing() -> None:
     plan = PlanCreate.model_validate({"resources": [_RESOURCE], "orders": [{"id": "o1", "stops": [_STOP]}]})
-    assert unknown_fields(plan) == []
+    assert [f.path for f in unknown_fields(plan)] == []
 
 
 def test_a_misspelled_field_on_a_resource_is_reported() -> None:
     plan = PlanCreate.model_validate({"resources": [{**_RESOURCE, "maxWorkingDurationn": "PT8H"}]})
-    assert unknown_fields(plan) == ["plan.resources[0].maxWorkingDurationn"]
+    assert [f.path for f in unknown_fields(plan)] == ["plan.resources[0].maxWorkingDurationn"]
 
 
 def test_a_misspelled_field_nested_under_a_union_is_reported() -> None:
@@ -43,7 +43,7 @@ def test_a_misspelled_field_nested_under_a_union_is_reported() -> None:
             "orders": [{"id": "o1", "stops": [{**_STOP, "operationDurationn": "PT5M"}]}],
         }
     )
-    assert sorted(unknown_fields(plan)) == [
+    assert sorted(f.path for f in unknown_fields(plan)) == [
         "plan.orders[0].stops[0].operationDurationn",
         "plan.resources[0].breaks[0].oops",
     ]
@@ -103,3 +103,39 @@ def test_the_generated_models_still_build_normally() -> None:
     order = Order.model_validate({"id": "o1", "stops": [_STOP]})
     assert resource.priority == 0
     assert isinstance(order.stops[0], models.SingleStop)
+
+
+def test_update_warns_on_a_near_miss_but_not_on_an_unknown_api_field() -> None:
+    # update() can't raise: the plan usually came from get(), so an unknown
+    # key may be a field the API added, which must be sent back untouched.
+    # A key one edit away from a declared one is the case that can't be.
+    import warnings as _warnings
+
+    from kardinal.routing.plans import PlansAPI
+
+    base = {"id": "4cbd0ab8-282c-4b30-b981-29e1ed8a2016", "resources": [_RESOURCE]}
+
+    class _Echo:
+        def request(self, *args, **kwargs):
+            return {"item": base}
+
+    def _warnings_for(resource_extra: dict) -> list:
+        plan = validate_response(Plan, {**base, "resources": [{**_RESOURCE, **resource_extra}]})
+        with _warnings.catch_warnings(record=True) as caught:
+            _warnings.simplefilter("always")
+            PlansAPI(_Echo()).update(plan)
+        return caught
+
+    assert _warnings_for({"fieldAddedByAFutureApi": "x"}) == []
+    near_miss = _warnings_for({"maxWorkingDurationn": "PT8H"})
+    assert len(near_miss) == 1
+    assert "maxWorkingDuration" in str(near_miss[0].message)
+
+
+def test_a_server_assigned_key_is_not_reported_as_a_spelling_mistake() -> None:
+    plan = PlanCreate.model_validate({"id": "deadbeef", "resources": [_RESOURCE]})
+    field = unknown_fields(plan)[0]
+    assert field.path == "plan.id"
+    assert field.suggestion is None
+    assert field.server_assigned
+    assert "server assigns it" in str(field)

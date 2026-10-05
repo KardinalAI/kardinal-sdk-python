@@ -205,7 +205,10 @@ def plans_validate(
     unknown = unknown_fields(plan)
     if unknown:
         emit(
-            [{"field": path, "error": "unknown field — check the spelling"} for path in unknown],
+            [
+                {"field": f.path, "error": f.hint or "unknown field"}
+                for f in unknown
+            ],
             force_json=True,
         )
         raise typer.Exit(Exit.BUSINESS_ERROR)

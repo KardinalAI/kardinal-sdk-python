@@ -4,28 +4,20 @@ hand-edited — precisely so it survives regeneration; only patches that are
 about pydantic's own behavior belong here, not anything that describes the
 API itself (that belongs in the spec).
 
-Importing this module patches `kardinal.routing.models` in place. `plans.py`
-imports it for that side effect before constructing anything, and every
-documented entry point (`Kardinal`, `routing.plans`, `routing.solutions`,
-`routing.examples`, the CLI) goes through `plans.py` first, so the patch is
-always in place by the time a user's code runs.
-
-**Known gap**: this is *not* guaranteed if a caller does
-`from kardinal.routing import models` on its own, bypassing every documented
-entry point — the patch would not have run yet. It isn't applied at the
-`kardinal.routing` package level instead, because that would run on every
-import of any submodule, including `kardinal.routing.cli`, which would
-reintroduce the exact "`--help` loads the models" problem this file's
-sibling fix (routing/cli.py's lazy imports) exists to avoid. Trade-off kept
-in favor of `--help` staying fast and connection-free.
+Importing this module patches `kardinal.routing.models` in place. The
+generated module imports it on its last line (appended by
+`scripts/generate_models.sh`), so the patches are applied by importing the
+models at all — no entry point can bypass them, and `--help` still doesn't
+load them because the CLI imports the models only inside command bodies.
 """
 
 from __future__ import annotations
 
+import difflib
 from contextlib import contextmanager
 from contextvars import ContextVar
 from enum import Enum
-from typing import Any, Iterator, Optional, Type, TypeVar
+from typing import Any, Iterator, NamedTuple, Optional, Type, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel, RootModel
@@ -45,50 +37,74 @@ def _generated_models() -> list[type[BaseModel]]:
     ]
 
 
-def _patch_keep_unknown_fields() -> bool:
-    """Generated models default to dropping an unknown key, which makes a
-    misspelled optional field impossible to detect: the value disappears
-    before anything can look at it, the plan is accepted, and the field it
-    was meant to set stays unset. 155 of the 231 fields on the request path
-    are optional, so most of a plan can be silently lost this way.
+# Server-assigned, so never something a caller meant to send. Lives here
+# rather than in plans.py because both the PUT body filter and the message
+# for an unknown key need it.
+PLAN_READ_ONLY_FIELDS = frozenset(
+    {
+        "id",
+        "agencyId",
+        "version",
+        "running",
+        "status",
+        "state",
+        "nbResources",
+        "nbOrders",
+        "createdAt",
+        "createdBy",
+        "updatedAt",
+        "updatedBy",
+        "archivedAt",
+    }
+)
 
-    Keep those keys instead of dropping them. Nothing is rejected here —
-    `unknown_fields()` reports them and `submit()` raises on what it finds.
-    `update()` does not check: the plan it sends usually came from `get()`,
-    so an unknown key there is more likely a field the API added after this
-    SDK version than a typo, and it has to be sent back untouched.
-    Responses keep parsing: an unknown key the server adds is retained
-    rather than refused, the same tolerance `_patch_lenient_enums` gives
-    enum values.
 
-    Rebuilding is done in several passes on purpose. A model compiles its
-    fields' validators into itself, so a model rebuilt before its members
-    keeps their stale version: `Order` rebuilt before `Stop` would still
-    drop what `Stop` now keeps. Repeating lets the change reach every
-    dependant whatever the declaration order.
+class UnknownField(NamedTuple):
+    """A key no model declared, and what it was most likely meant to be.
+
+    `suggestion` is a declared field of the same model one or two edits
+    away — strong evidence of a typo, as opposed to a key the API may have
+    added after this SDK version, which resembles nothing.
     """
-    plain = [c for c in _generated_models() if not issubclass(c, RootModel)]
-    for cls in plain:
-        cls.model_config["extra"] = "allow"
-    for _ in range(3):
-        for cls in _generated_models():
-            cls.model_rebuild(force=True)
-    return bool(plain)
+
+    path: str
+    suggestion: Optional[str]
+    server_assigned: bool
+
+    @property
+    def hint(self) -> Optional[str]:
+        if self.server_assigned:
+            return "not a field you set: the server assigns it"
+        return f"did you mean {self.suggestion}?" if self.suggestion else None
+
+    def __str__(self) -> str:
+        hint = self.hint
+        return self.path if hint is None else f"{self.path}  ({hint})"
 
 
-KEEP_UNKNOWN_FIELDS_PATCH_APPLIED = _patch_keep_unknown_fields()
+def _describe(key: str, owner: type[BaseModel], path: str) -> UnknownField:
+    close = difflib.get_close_matches(key, owner.model_fields, n=1)
+    return UnknownField(
+        path=path,
+        suggestion=close[0] if close else None,
+        server_assigned=key in PLAN_READ_ONLY_FIELDS,
+    )
 
 
-def unknown_fields(obj: Any, path: str = "plan") -> list[str]:
-    """Paths of every key no model declared, e.g.
-    `plan.resources[0].maxWorkingDurationn`. Empty when the payload is clean.
+def unknown_fields(obj: Any, path: str = "plan") -> list[UnknownField]:
+    """Every key no model declared, with its path — e.g.
+    `plan.resources[0].maxWorkingDurationn` — and a hint when the name is
+    one edit away from a real field. Empty when the payload is clean.
     """
-    found: list[str] = []
+    found: list[UnknownField] = []
     if isinstance(obj, RootModel):
         return unknown_fields(obj.root, path)
     if isinstance(obj, BaseModel):
-        found += [f"{path}.{key}" for key in sorted(obj.model_extra or {})]
-        for name in type(obj).model_fields:
+        owner = type(obj)
+        found += [
+            _describe(key, owner, f"{path}.{key}") for key in sorted(obj.model_extra or {})
+        ]
+        for name in owner.model_fields:
             found += unknown_fields(getattr(obj, name, None), f"{path}.{name}")
     elif isinstance(obj, list):
         for index, item in enumerate(obj):

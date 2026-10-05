@@ -28,7 +28,7 @@ def test_an_empty_plan_is_rejected() -> None:
 
 def test_an_unknown_plan_level_field_is_reported_like_any_other() -> None:
     plan = PlanCreate.model_validate({"resources": [_RESOURCE], "bogusField": 123})
-    assert unknown_fields(plan) == ["plan.bogusField"]
+    assert [f.path for f in unknown_fields(plan)] == ["plan.bogusField"]
 
 
 def test_a_client_supplied_id_is_reported_rather_than_silently_lost() -> None:
@@ -37,7 +37,7 @@ def test_a_client_supplied_id_is_reported_rather_than_silently_lost() -> None:
     # — so a caller reusing the one they sent would address a plan that
     # doesn't exist. Reported here instead.
     plan = PlanCreate.model_validate({"id": "should-not-exist", "resources": [_RESOURCE]})
-    assert unknown_fields(plan) == ["plan.id"]
+    assert [f.path for f in unknown_fields(plan)] == ["plan.id"]
 
 
 def test_a_minimal_valid_plan_is_accepted_with_its_defaults() -> None:
@@ -80,7 +80,7 @@ def test_an_unknown_resource_field_is_kept_so_submit_can_report_it() -> None:
     # Dropping it here is what used to make a misspelled optional field
     # undetectable: `submit()` raises on what `unknown_fields()` finds.
     plan = PlanCreate.model_validate({"resources": [{**_RESOURCE, "bogus": 1}]})
-    assert unknown_fields(plan) == ["plan.resources[0].bogus"]
+    assert [f.path for f in unknown_fields(plan)] == ["plan.resources[0].bogus"]
     assert plan.resources[0].priority == 0
 
 

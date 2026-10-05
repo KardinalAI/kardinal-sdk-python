@@ -306,7 +306,7 @@ def test_an_order_appended_to_a_fetched_plan_is_sent() -> None:
 
 def test_a_hand_built_order_keeps_an_unknown_field_for_submit_to_report() -> None:
     order = Order(id="o1", stops=[], typo=True)
-    assert unknown_fields(order, "order") == ["order.typo"]
+    assert [f.path for f in unknown_fields(order, "order")] == ["order.typo"]
 
 
 @respx.mock
