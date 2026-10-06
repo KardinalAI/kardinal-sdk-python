@@ -13,7 +13,7 @@ import typer
 from pydantic import ValidationError
 
 from .._core.cli import Exit, cli_client, emit, fail
-from .._core.errors import KardinalError
+from .._core.errors import KardinalError, UnknownFieldWarning
 
 routing = typer.Typer(help="Route optimization.")
 plans = typer.Typer(help="Submit, retrieve, and update plans.")
@@ -97,7 +97,10 @@ def plans_update(
                 warnings.simplefilter("always")
                 updated = client.routing.plans.update(plan, force=force)
             for warning in caught:
-                typer.secho(f"warning: {warning.message}", err=True, fg=typer.colors.YELLOW)
+                # Only ours: the block above wraps the HTTP call too, and an
+                # unrelated DeprecationWarning is not a plan problem.
+                if issubclass(warning.category, UnknownFieldWarning):
+                    typer.secho(f"warning: {warning.message}", err=True, fg=typer.colors.YELLOW)
     except ValidationError as exc:
         emit(
             [

@@ -157,3 +157,62 @@ def test_allow_unknown_still_catches_a_typo_elsewhere() -> None:
     with pytest.raises(UnknownFieldError) as excinfo:
         api.update(plan, allow_unknown=["aFieldThisSdkDoesNotKnow"])
     assert excinfo.value.paths == ["plan.resources[0].maxWorkingDurationn"]
+
+
+def test_a_key_the_server_sent_on_one_type_does_not_excuse_it_on_another() -> None:
+    # Provenance is (model type, key), not the key alone. Keyed by name only,
+    # an `apiAdded` the server sent on a Resource would excuse a caller's
+    # `apiAdded` typed onto a Stop.
+    from kardinal.routing import models
+
+    api, plan, _ = _fetched([{**_RESOURCE, "apiAdded": "x"}])
+    plan.orders = [
+        type(plan).model_fields["orders"].annotation.__args__[0].__args__[0].model_validate(
+            {
+                "id": "o1",
+                "stops": [
+                    {
+                        "type": "single",
+                        "id": "s1",
+                        "position": {"lat": 48.85, "lon": 2.35},
+                        "apiAdded": "x",
+                    }
+                ],
+            }
+        )
+    ]
+    with pytest.raises(UnknownFieldError) as excinfo:
+        api.update(plan)
+    assert excinfo.value.paths == ["plan.orders[0].stops[0].apiAdded"]
+    assert isinstance(plan.resources[0], models.Resource)
+
+
+def test_allow_unknown_refuses_a_bare_string() -> None:
+    # `str` satisfies Collection[str], so this type-checks; `in` would then
+    # match any key that is a substring of it, waving through a real typo.
+    api, plan, _ = _fetched([_RESOURCE])
+    plan.resources[0].maxWorkingDurationn = "PT8H"
+    with pytest.raises(TypeError, match="list of field names"):
+        api.update(plan, allow_unknown="maxWorkingDurationnn")
+
+
+def test_an_order_appended_by_hand_is_not_refused_for_its_class() -> None:
+    # Plan.orders holds PlanOrder, and Plan's docstring invites appending a
+    # plain Order. Both describe the same thing to the API, so a field the
+    # server sent on one must not be refused on the other.
+    from kardinal.routing.plans import Order
+
+    api, plan, _ = _fetched([_RESOURCE])
+    plan.orders = []
+    api, plan, _ = _fetched([_RESOURCE])
+    server_order = {
+        "id": "o1",
+        "stops": [{"type": "single", "id": "s1", "position": {"lat": 48.85, "lon": 2.35}}],
+        "apiAddedOnOrder": "x",
+    }
+    server = _Server([_RESOURCE])
+    server.item["orders"] = [server_order]
+    api = PlansAPI(server)
+    plan = api.get(_PID)
+    plan.orders.append(Order.model_validate({**server_order, "id": "o2"}))
+    api.update(plan)  # no exception

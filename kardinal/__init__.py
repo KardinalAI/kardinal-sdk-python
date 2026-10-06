@@ -18,6 +18,7 @@ from ._core.errors import (
     KardinalTimeoutError,
     KardinalValidationError,
     UnknownFieldError,
+    UnknownFieldWarning,
 )
 from ._core.pagination import Page
 from ._core.transport import Transport
@@ -34,6 +35,7 @@ __all__ = [
     "KardinalLimitError",
     "KardinalValidationError",
     "UnknownFieldError",
+    "UnknownFieldWarning",
     "KardinalNotFoundError",
     "KardinalRateLimitError",
     "KardinalServerError",

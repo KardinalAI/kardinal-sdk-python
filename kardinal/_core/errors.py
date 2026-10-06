@@ -91,15 +91,24 @@ class KardinalValidationError(KardinalError):
     """
 
 
+class UnknownFieldWarning(UserWarning):
+    """A key that looks like a typo, on a plan this SDK never read.
+
+    Separate category so a caller — and the CLI — can tell it from any
+    unrelated warning raised while the request is in flight.
+    """
+
+
 class UnknownFieldError(KardinalError):
-    """A key no model declares was found in a plan being submitted.
+    """A key no model declares was found in a plan being sent.
 
     Almost always a misspelled optional field. The API drops such a key
     without complaining, and so would this SDK, so the field it was meant
     to set stays unset and the plan is optimized without it: a stop with a
     misspelled `operationDuration` takes no time, an order with a
-    misspelled `requiredSkills` can go on any resource. Raised before the
-    request leaves, since nothing downstream will report it.
+    misspelled `requiredSkills` can go on any resource. Raised by `submit()`
+    on any such key, and by `update()` on one the server didn't send, before
+    the request leaves — nothing downstream will report it.
     """
 
     def __init__(self, fields: Sequence[Any]) -> None:

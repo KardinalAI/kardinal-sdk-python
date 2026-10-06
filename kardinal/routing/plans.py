@@ -7,11 +7,11 @@ from __future__ import annotations
 
 import warnings
 
-from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, Collection, Dict, Iterator, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
-from .._core.errors import UnknownFieldError
+from .._core.errors import UnknownFieldError, UnknownFieldWarning
 from .._core.pagination import Page, iter_all as _iter_all
 from .._core.transport import Transport
 from . import _annotations  # import side effect: patches models.PlanId
@@ -142,6 +142,34 @@ class Plan(models.Plan):
     warnings: List[models.Warning] = []
 
 
+
+def _allowed(allow_unknown: Collection[str]) -> frozenset:
+    """`allow_unknown` as a set of names.
+
+    A bare `str` is refused rather than accepted: `str` satisfies
+    `Collection[str]`, so `allow_unknown="someField"` type-checks, and `in`
+    would then match any key that is a *substring* of it — dropping the
+    brackets around one name would wave through a genuine typo, which is
+    exactly what this check exists to catch.
+    """
+    if isinstance(allow_unknown, str):
+        raise TypeError("allow_unknown takes a list of field names, not a single string")
+    return frozenset(allow_unknown)
+
+
+def _vouched_for(field, server_keys) -> bool:
+    """Did the server send this key on this kind of object?
+
+    Types are compared along the inheritance chain, not by identity:
+    `Plan.orders` holds `PlanOrder`, while the docstring of `Plan` invites
+    appending a plain `Order`, and both describe the same thing to the API.
+    """
+    return any(
+        key == field.key and (issubclass(field.owner, cls) or issubclass(cls, field.owner))
+        for cls, key in server_keys
+    )
+
+
 def _plan_from_envelope(response: Dict[str, Any]) -> Plan:
     """`EnvelopedPlan.item`, plus `EnvelopedPlan.warnings` copied onto the
     returned `Plan` — `warnings` is a sibling of `item` in the response
@@ -162,7 +190,7 @@ class PlansAPI:
     def __init__(self, transport: Transport) -> None:
         self._transport = transport
 
-    def submit(self, plan: PlanCreate, *, allow_unknown: Sequence[str] = ()) -> Plan:
+    def submit(self, plan: PlanCreate, *, allow_unknown: Collection[str] = ()) -> Plan:
         """`POST /plans`. Creates a new plan and starts optimization —
         billed in full. The server assigns `id`.
 
@@ -171,7 +199,8 @@ class PlansAPI:
         by one on purpose: a blanket switch would wave through a typo
         anywhere else in the plan, which is what this check exists to catch.
         """
-        unknown = [f for f in _annotations.unknown_fields(plan) if f.key not in allow_unknown]
+        allowed = _allowed(allow_unknown)
+        unknown = [f for f in _annotations.unknown_fields(plan) if f.key not in allowed]
         if unknown:
             raise UnknownFieldError(unknown)
         body = plan.model_dump(mode="json", exclude_none=True)
@@ -186,7 +215,7 @@ class PlansAPI:
         return _plan_from_envelope(response)
 
     def update(
-        self, plan: Plan, *, force: bool = False, allow_unknown: Sequence[str] = ()
+        self, plan: Plan, *, force: bool = False, allow_unknown: Collection[str] = ()
     ) -> Plan:
         """`PUT /plans/{id}`. Sends the complete plan, replacing the stored one
         (anything left out is removed; fields this SDK version doesn't know,
@@ -214,16 +243,21 @@ class PlansAPI:
         isn't already on the fetched plan. See `submit` for why it names
         fields rather than switching the check off.
         """
-        unknown = [f for f in _annotations.unknown_fields(plan) if f.key not in allow_unknown]
+        allowed = _allowed(allow_unknown)
+        unknown = [f for f in _annotations.unknown_fields(plan) if f.key not in allowed]
         if plan._from_server:
-            added_by_caller = [f for f in unknown if f.origin not in plan._server_keys]
+            added_by_caller = [f for f in unknown if not _vouched_for(f, plan._server_keys)]
             if added_by_caller:
                 raise UnknownFieldError(added_by_caller)
         else:
             likely_typos = [f for f in unknown if f.suggestion]
             if likely_typos:
                 listed = ", ".join(str(f) for f in likely_typos)
-                warnings.warn(f"Possible typo(s) in the plan being sent: {listed}", stacklevel=2)
+                warnings.warn(
+                    f"Possible typo(s) in the plan being sent: {listed}",
+                    UnknownFieldWarning,
+                    stacklevel=2,
+                )
         # `warnings` is this SDK's own field (see `Plan`), not the plan's.
         body = plan.model_dump(
             mode="json", exclude_none=True, exclude=set(_PLAN_READ_ONLY_FIELDS | {"warnings"})

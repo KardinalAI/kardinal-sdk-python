@@ -194,7 +194,8 @@ KardinalError
 ├── KardinalOptimizationError   solutions.wait() has no solution to return: NO_SOLUTION,
 │                               PLAN_SUPERSEDED, OPTIMIZATION_STALLED (engine crashed)
 ├── KardinalConnectionError     DNS/connection/read failure, no HTTP response at all
-└── UnknownFieldError           submit(): a key no model declares, raised before sending
+└── UnknownFieldError           a key no model declares, raised before sending
+                                (submit: any; update: one the server didn't send)
 ```
 
 `UnknownFieldError` is the one raised without a request being made. Most
