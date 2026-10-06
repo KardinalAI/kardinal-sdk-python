@@ -5,6 +5,7 @@ surface (`k.routing.plans.submit` -> `kardinal routing plans submit`), plus
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -89,7 +90,14 @@ def plans_update(
     try:
         plan = Plan.model_validate_json(file.read_text())
         with _client() as client:
-            updated = client.routing.plans.update(plan, force=force)
+            # A plan from a file carries no provenance, so update() can only
+            # warn on what resembles a real field. Shown in the CLI's own
+            # format rather than as a raw Python warning on stderr.
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                updated = client.routing.plans.update(plan, force=force)
+            for warning in caught:
+                typer.secho(f"warning: {warning.message}", err=True, fg=typer.colors.YELLOW)
     except ValidationError as exc:
         emit(
             [

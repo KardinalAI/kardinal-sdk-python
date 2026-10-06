@@ -102,6 +102,17 @@ class UnknownField(NamedTuple):
     path: str
     suggestion: Optional[str]
     server_assigned: bool
+    owner: type
+    key: str
+
+    @property
+    def origin(self) -> tuple[type, str]:
+        """Identity of the key for provenance, by model type rather than by
+        path: `resources[3]` moves as soon as the caller reorders or drops a
+        resource, while a field the API added has the same name on every
+        object of that type.
+        """
+        return (self.owner, self.key)
 
     @property
     def hint(self) -> Optional[str]:
@@ -125,6 +136,8 @@ def _describe(key: str, owner: type[BaseModel], path: str) -> UnknownField:
         # Only at the top level: these names are the plan's. An unknown
         # `version` on an order is not something the server assigns.
         server_assigned=key in PLAN_READ_ONLY_FIELDS and path.count(".") == 1,
+        owner=owner,
+        key=key,
     )
 
 

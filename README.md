@@ -211,12 +211,13 @@ Unknown field(s) in the plan:
   plan.orders[0].stops[0].operationDurationn  (did you mean operationDuration?)
 ```
 
-`update()` warns instead of raising, and only for a key that resembles a
-declared field. The plan it sends usually came from `get()`, so an unknown
-key there may be a field the API added after this SDK version — it is sent
-back untouched, since a full replacement would otherwise delete it. A key
-within two edits of a real field is the case that can't be explained that
-way.
+`update()` sorts an unknown key by where it came from. One the server sent
+is a field the API added after this SDK version: it is sent back untouched,
+since a full replacement would otherwise delete it. One you added is a typo
+— the API drops what it doesn't know — and raises, exactly as `submit()`
+does. On a plan this SDK didn't read from the API (built by hand, or loaded
+from a file) there is nothing to sort by, so it only warns, and only for a
+key within two edits of a real field.
 
 Responses are never affected: a key the API adds is kept, not refused.
 

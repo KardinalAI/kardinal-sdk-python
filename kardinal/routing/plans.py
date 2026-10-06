@@ -9,7 +9,7 @@ import warnings
 
 from typing import Any, Dict, Iterator, List, Literal, Optional, Tuple, Union
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 from .._core.errors import UnknownFieldError
 from .._core.pagination import Page, iter_all as _iter_all
@@ -121,6 +121,21 @@ class Plan(models.Plan):
 
     model_config = ConfigDict(extra="allow")
 
+    # Keys the server sent that no model declares. Filled by
+    # `_plan_from_envelope`, so it is set on any plan that came from the
+    # API and empty on one built by hand or read from a file. `update()`
+    # uses it to tell a field the API added from a key the caller typed:
+    # the API drops what it doesn't know (verified on both POST and PUT),
+    # so anything it sends back is a real field by construction.
+    #
+    # A private attribute, so it survives `model_copy()` and `deepcopy`
+    # without ever reaching the wire. It does not survive a round trip
+    # through `model_dump()` / `model_validate()` — such a plan is treated
+    # as hand-built, which only costs the stricter check, never a false
+    # rejection.
+    _server_keys: set = PrivateAttr(default_factory=set)
+    _from_server: bool = PrivateAttr(default=False)
+
     # Narrowing the generated fields, on purpose (see above).
     id: str  # type: ignore[assignment]
     orders: Optional[List[PlanOrder]] = None  # type: ignore[assignment]
@@ -134,6 +149,8 @@ def _plan_from_envelope(response: Dict[str, Any]) -> Plan:
     """
     plan = validate_response(Plan, response["item"])
     plan.warnings = [validate_response(models.Warning, w) for w in response.get("warnings") or []]
+    plan._server_keys = {f.origin for f in _annotations.unknown_fields(plan)}
+    plan._from_server = True
     return plan
 
 
@@ -173,17 +190,28 @@ class PlansAPI:
 
         `force` unarchives the plan first if it's archived; ignored otherwise.
 
-        Warns, rather than raises, on a key that looks like a typo. A plan
-        here usually came from `get()`, so an unknown key is as likely to be
-        a field the API added after this SDK version — which must be sent
-        back untouched, or the full replacement deletes it server-side. Only
-        a key within two edits of a declared field is reported, since that
-        resemblance is what a future API field wouldn't have.
+        Unknown keys are sorted by where they came from. One the server
+        sent is a field the API added after this SDK version: it is sent
+        back untouched, since a full replacement would otherwise delete it.
+        One the caller added is a typo — the API drops what it doesn't
+        know, so it would vanish in silence — and raises
+        `UnknownFieldError`, exactly as in `submit()`.
+
+        On a plan this SDK didn't read from the API (built by hand, or
+        loaded from a file) there is nothing to sort by, so it falls back to
+        warning on a key within two edits of a declared field, which is as
+        far as resemblance alone can go.
         """
-        likely_typos = [f for f in _annotations.unknown_fields(plan) if f.suggestion]
-        if likely_typos:
-            listed = ", ".join(str(f) for f in likely_typos)
-            warnings.warn(f"Possible typo(s) in the plan being sent: {listed}", stacklevel=2)
+        unknown = _annotations.unknown_fields(plan)
+        if plan._from_server:
+            added_by_caller = [f for f in unknown if f.origin not in plan._server_keys]
+            if added_by_caller:
+                raise UnknownFieldError(added_by_caller)
+        else:
+            likely_typos = [f for f in unknown if f.suggestion]
+            if likely_typos:
+                listed = ", ".join(str(f) for f in likely_typos)
+                warnings.warn(f"Possible typo(s) in the plan being sent: {listed}", stacklevel=2)
         # `warnings` is this SDK's own field (see `Plan`), not the plan's.
         body = plan.model_dump(
             mode="json", exclude_none=True, exclude=set(_PLAN_READ_ONLY_FIELDS | {"warnings"})
