@@ -131,16 +131,16 @@ class Plan(models.Plan):
     # A private attribute, so it survives `model_copy()` and `deepcopy`
     # without ever reaching the wire. It does not survive a round trip
     # through `model_dump()` / `model_validate()` — such a plan is treated
-    # as hand-built, which only costs the stricter check, never a false
-    # rejection.
-    _server_keys: set = PrivateAttr(default_factory=set)
+    # as hand-built and falls back to the weaker check: a warning on
+    # near-misses only. It never refuses a real API field, but it no longer
+    # catches a typo either.
+    _server_keys: set[tuple[type, str]] = PrivateAttr(default_factory=set)
     _from_server: bool = PrivateAttr(default=False)
 
     # Narrowing the generated fields, on purpose (see above).
     id: str  # type: ignore[assignment]
     orders: Optional[List[PlanOrder]] = None  # type: ignore[assignment]
     warnings: List[models.Warning] = []
-
 
 
 def _allowed(allow_unknown: Collection[str]) -> frozenset:
@@ -198,6 +198,10 @@ class PlansAPI:
         declare — a field the API gained since it was released. Named one
         by one on purpose: a blanket switch would wave through a typo
         anywhere else in the plan, which is what this check exists to catch.
+
+        A name given here is allowed on every object of the plan, not just
+        the one you had in mind: unlike provenance, which is recorded per
+        model type, this matches the key alone.
         """
         allowed = _allowed(allow_unknown)
         unknown = [f for f in _annotations.unknown_fields(plan) if f.key not in allowed]
@@ -240,8 +244,9 @@ class PlansAPI:
 
         `allow_unknown` names fields to send that this SDK version doesn't
         declare, for a field the API gained since it was released and that
-        isn't already on the fetched plan. See `submit` for why it names
-        fields rather than switching the check off.
+        isn't already on the fetched plan. A name given here is allowed on
+        every object of the plan, not just the one you had in mind. See
+        `submit` for why it names fields rather than switching the check off.
         """
         allowed = _allowed(allow_unknown)
         unknown = [f for f in _annotations.unknown_fields(plan) if f.key not in allowed]
