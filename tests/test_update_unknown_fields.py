@@ -134,3 +134,26 @@ def test_a_json_round_trip_degrades_to_the_hand_built_rules() -> None:
         warnings.simplefilter("always")
         PlansAPI(_Server([])).update(reloaded)
     assert caught == []  # no resemblance, so nothing to say
+
+
+def test_allow_unknown_lets_a_caller_use_a_field_the_sdk_does_not_know() -> None:
+    # A field the API gained since this SDK was released, not present on
+    # the fetched plan, so provenance can't vouch for it. Without this the
+    # caller would be blocked until the SDK ships a version that knows it.
+    api, plan, server = _fetched([_RESOURCE])
+    plan.resources[0].aFieldThisSdkDoesNotKnow = "x"
+    with pytest.raises(UnknownFieldError):
+        api.update(plan)
+    api.update(plan, allow_unknown=["aFieldThisSdkDoesNotKnow"])
+    assert server.sent["resources"][0]["aFieldThisSdkDoesNotKnow"] == "x"
+
+
+def test_allow_unknown_still_catches_a_typo_elsewhere() -> None:
+    # Named fields, not a blanket switch: the point is to keep checking
+    # everything the caller didn't explicitly vouch for.
+    api, plan, _ = _fetched([_RESOURCE])
+    plan.resources[0].aFieldThisSdkDoesNotKnow = "x"
+    plan.resources[0].maxWorkingDurationn = "PT8H"
+    with pytest.raises(UnknownFieldError) as excinfo:
+        api.update(plan, allow_unknown=["aFieldThisSdkDoesNotKnow"])
+    assert excinfo.value.paths == ["plan.resources[0].maxWorkingDurationn"]

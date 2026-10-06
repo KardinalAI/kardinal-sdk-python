@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import warnings
 
-from typing import Any, Dict, Iterator, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
@@ -115,8 +115,8 @@ class Plan(models.Plan):
     day the API adds a field this version doesn't know, and what lets
     `update()` — a full replacement — send that field back instead of
     deleting it server-side. On the request side the key is kept so
-    `submit()` can report it; `update()` only warns, and only for a key
-    that resembles a declared one (see `update`).
+    `submit()` can report it; `update()` tells a key the server sent from
+    one the caller added, using `_server_keys` below (see `update`).
     """
 
     model_config = ConfigDict(extra="allow")
@@ -162,11 +162,16 @@ class PlansAPI:
     def __init__(self, transport: Transport) -> None:
         self._transport = transport
 
-    def submit(self, plan: PlanCreate) -> Plan:
+    def submit(self, plan: PlanCreate, *, allow_unknown: Sequence[str] = ()) -> Plan:
         """`POST /plans`. Creates a new plan and starts optimization —
         billed in full. The server assigns `id`.
+
+        `allow_unknown` names fields to send that this SDK version doesn't
+        declare — a field the API gained since it was released. Named one
+        by one on purpose: a blanket switch would wave through a typo
+        anywhere else in the plan, which is what this check exists to catch.
         """
-        unknown = _annotations.unknown_fields(plan)
+        unknown = [f for f in _annotations.unknown_fields(plan) if f.key not in allow_unknown]
         if unknown:
             raise UnknownFieldError(unknown)
         body = plan.model_dump(mode="json", exclude_none=True)
@@ -180,7 +185,9 @@ class PlansAPI:
         response = self._transport.request("GET", f"/plans/{plan_id}")
         return _plan_from_envelope(response)
 
-    def update(self, plan: Plan, *, force: bool = False) -> Plan:
+    def update(
+        self, plan: Plan, *, force: bool = False, allow_unknown: Sequence[str] = ()
+    ) -> Plan:
         """`PUT /plans/{id}`. Sends the complete plan, replacing the stored one
         (anything left out is removed; fields this SDK version doesn't know,
         read by `get()`, are kept and sent back). The version increments, and the plan
@@ -201,8 +208,13 @@ class PlansAPI:
         loaded from a file) there is nothing to sort by, so it falls back to
         warning on a key within two edits of a declared field, which is as
         far as resemblance alone can go.
+
+        `allow_unknown` names fields to send that this SDK version doesn't
+        declare, for a field the API gained since it was released and that
+        isn't already on the fetched plan. See `submit` for why it names
+        fields rather than switching the check off.
         """
-        unknown = _annotations.unknown_fields(plan)
+        unknown = [f for f in _annotations.unknown_fields(plan) if f.key not in allow_unknown]
         if plan._from_server:
             added_by_caller = [f for f in unknown if f.origin not in plan._server_keys]
             if added_by_caller:

@@ -175,3 +175,26 @@ def test_a_short_name_is_not_matched_to_an_unrelated_short_field() -> None:
     from kardinal.routing._annotations import _describe
 
     assert _describe("id", PlanCreate, "plan.id").suggestion is None
+
+
+def test_submit_allow_unknown_sends_the_named_field_and_checks_the_rest() -> None:
+    from kardinal.routing.plans import PlansAPI
+
+    class _Capture:
+        sent = None
+
+        def request(self, method, path, **kwargs):
+            self.sent = kwargs.get("json")
+            return {"item": {"id": "4cbd0ab8-282c-4b30-b981-29e1ed8a2016", "resources": []}}
+
+    plan = PlanCreate.model_validate(
+        {"resources": [{**_RESOURCE, "aFieldThisSdkDoesNotKnow": "x"}]}
+    )
+    server = _Capture()
+    PlansAPI(server).submit(plan, allow_unknown=["aFieldThisSdkDoesNotKnow"])
+    assert server.sent["resources"][0]["aFieldThisSdkDoesNotKnow"] == "x"
+
+    plan.resources[0].maxWorkingDurationn = "PT8H"
+    with pytest.raises(UnknownFieldError) as excinfo:
+        PlansAPI(server).submit(plan, allow_unknown=["aFieldThisSdkDoesNotKnow"])
+    assert excinfo.value.paths == ["plan.resources[0].maxWorkingDurationn"]

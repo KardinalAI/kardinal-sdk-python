@@ -219,6 +219,13 @@ does. On a plan this SDK didn't read from the API (built by hand, or loaded
 from a file) there is nothing to sort by, so it only warns, and only for a
 key within two edits of a real field.
 
+If the API gains a field before this SDK knows it, name it to send it
+anyway — everything else stays checked:
+
+```python
+k.routing.plans.update(plan, allow_unknown=["aFieldAddedByTheApi"])
+```
+
 Responses are never affected: a key the API adds is kept, not refused.
 
 All of them are importable from `kardinal` itself
