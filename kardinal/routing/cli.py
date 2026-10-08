@@ -97,10 +97,20 @@ def plans_update(
                 warnings.simplefilter("always")
                 updated = client.routing.plans.update(plan, force=force)
             for warning in caught:
-                # Only ours: the block above wraps the HTTP call too, and an
-                # unrelated DeprecationWarning is not a plan problem.
                 if issubclass(warning.category, UnknownFieldWarning):
                     typer.secho(f"warning: {warning.message}", err=True, fg=typer.colors.YELLOW)
+                else:
+                    # Capturing the whole call also catches warnings that have
+                    # nothing to do with the plan — a DeprecationWarning from a
+                    # dependency, say. Those are not ours to reformat, but
+                    # swallowing them would hide something the caller was meant
+                    # to see, so they are re-emitted as they were raised.
+                    warnings.warn_explicit(
+                        warning.message,
+                        warning.category,
+                        warning.filename,
+                        warning.lineno,
+                    )
     except ValidationError as exc:
         emit(
             [

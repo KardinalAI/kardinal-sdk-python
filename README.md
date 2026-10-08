@@ -12,6 +12,9 @@ The package is published as `kardinal-ai`, but you import it as `kardinal`
 (`from kardinal import Kardinal`) and the command is `kardinal`. Python 3.10
 or later.
 
+The package ships its types, so a type checker sees them: a misspelled attribute
+or a wrong argument type is reported in your editor, before anything runs.
+
 API documentation: https://developers.kardinal.ai
 
 ## Quickstart

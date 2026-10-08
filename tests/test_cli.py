@@ -545,3 +545,31 @@ def test_solutions_wait_takes_a_timeout_in_seconds_and_prints_final_state(monkey
     payload = json.loads(result.stdout)
     assert payload["finalState"] == "optimized"
     assert "final_state" not in payload
+
+
+def test_plans_update_does_not_swallow_an_unrelated_warning(tmp_path, monkeypatch) -> None:
+    """Capturing the whole call to reformat our own warning must not hide
+    someone else's: a DeprecationWarning from a dependency is something the
+    caller was meant to see.
+    """
+    import warnings as _warnings
+
+    from kardinal.routing import plans as plans_module
+
+    plan_file = tmp_path / "plan.json"
+    plan_file.write_text(
+        json.dumps({"id": _PLAN_ID, "resources": [], "orders": []})
+    )
+
+    def _update(self, plan, *, force=False, allow_unknown=()):
+        _warnings.warn("something else entirely", DeprecationWarning, stacklevel=2)
+        return plan
+
+    monkeypatch.setattr(plans_module.PlansAPI, "update", _update)
+
+    with _warnings.catch_warnings(record=True) as seen:
+        _warnings.simplefilter("always")
+        result = runner.invoke(app, ["routing", "plans", "update", str(plan_file)])
+
+    assert result.exit_code == 0, result.stdout
+    assert [str(w.message) for w in seen] == ["something else entirely"]

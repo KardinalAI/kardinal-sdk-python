@@ -57,6 +57,12 @@ dev = [
 [project.scripts]
 kardinal = "kardinal.cli:app"
 
+# PEP 561: without this marker in the wheel, a user's mypy or pyright skips
+# the package entirely — every annotation here is invisible to them, and a
+# misspelled attribute or a wrong argument type is reported nowhere.
+[tool.setuptools.package-data]
+kardinal = ["py.typed"]
+
 [tool.setuptools.packages.find]
 include = ["kardinal*"]
 
