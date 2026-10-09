@@ -27,3 +27,8 @@ test:
     - pip install -q build twine
     - python -m build --outdir dist/ >/dev/null
     - twine check --strict dist/*
+    # PEP 561: present in the tree but absent from the wheel is the failure
+    # that matters — the repo type-checks and the user still sees nothing.
+    # Checked here rather than in pytest, where it would need `build`
+    # installed before the tests and would otherwise skip in silence.
+    - python -m zipfile -l dist/*.whl | grep -q kardinal/py.typed
