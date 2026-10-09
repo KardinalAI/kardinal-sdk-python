@@ -36,7 +36,7 @@ def _transport() -> Transport:
 
 @respx.mock
 def test_get_is_retried_and_succeeds_after_a_5xx(monkeypatch) -> None:
-    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt: None)
+    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt, retry_after=None: None)
     route = respx.get(f"{DEFAULT_BASE_URL}/plans/p1").mock(
         side_effect=[
             httpx.Response(503),
@@ -49,11 +49,32 @@ def test_get_is_retried_and_succeeds_after_a_5xx(monkeypatch) -> None:
 
 
 @respx.mock
+def test_a_429_waits_as_long_as_the_server_asked(monkeypatch) -> None:
+    """Honouring `Retry-After` only works if the header actually reaches the
+    wait: computing it and then sleeping on our own schedule looks identical
+    from the outside until a real rate limiter is involved.
+    """
+    waited: list = []
+    monkeypatch.setattr(
+        "kardinal._core.retry.sleep",
+        lambda attempt, retry_after=None: waited.append(retry_after),
+    )
+    respx.get(f"{DEFAULT_BASE_URL}/plans/p1").mock(
+        side_effect=[
+            httpx.Response(429, headers={"Retry-After": "7"}),
+            httpx.Response(200, json={"ok": True}),
+        ]
+    )
+    _transport().request("GET", "/plans/p1")
+    assert waited == ["7"]
+
+
+@respx.mock
 def test_post_is_not_retried_on_a_5xx(monkeypatch) -> None:
     """No Idempotency-Key in the spec: retrying a POST after a 5xx could
     double-create a plan, so it must fail on the first 5xx, not retry.
     """
-    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt: None)
+    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt, retry_after=None: None)
     route = respx.post(f"{DEFAULT_BASE_URL}/plans").mock(
         return_value=httpx.Response(503)
     )
@@ -64,7 +85,7 @@ def test_post_is_not_retried_on_a_5xx(monkeypatch) -> None:
 
 @respx.mock
 def test_get_gives_up_after_max_retries(monkeypatch) -> None:
-    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt: None)
+    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt, retry_after=None: None)
     route = respx.get(f"{DEFAULT_BASE_URL}/plans/p1").mock(
         return_value=httpx.Response(503)
     )
@@ -75,7 +96,7 @@ def test_get_gives_up_after_max_retries(monkeypatch) -> None:
 
 @respx.mock
 def test_network_error_is_retried_then_raises_connection_error(monkeypatch) -> None:
-    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt: None)
+    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt, retry_after=None: None)
     route = respx.get(f"{DEFAULT_BASE_URL}/plans/p1").mock(
         side_effect=httpx.ConnectError("refused")
     )
@@ -175,7 +196,7 @@ def test_a_read_failure_on_post_is_not_retryable() -> None:
 
 @respx.mock
 def test_a_read_failure_on_get_is_retryable(monkeypatch) -> None:
-    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt: None)
+    monkeypatch.setattr("kardinal._core.retry.sleep", lambda attempt, retry_after=None: None)
     respx.get(f"{DEFAULT_BASE_URL}/plans").mock(side_effect=httpx.ReadTimeout("timed out"))
     with pytest.raises(KardinalConnectionError) as info:
         Transport(api_key="test-key").request("GET", "/plans")

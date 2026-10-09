@@ -235,6 +235,21 @@ anyway — everything else stays checked:
 k.routing.plans.update(plan, allow_unknown=["aFieldAddedByTheApi"])
 ```
 
+A name listed there is allowed **anywhere in the plan**, not only on the
+object you had in mind — so prefer a distinctive name over a common one
+like `priority`, which would stop being checked on every resource, order
+and stop at once.
+
+To ask before sending rather than catch the error, run the same check
+yourself:
+
+```python
+from kardinal.routing import unknown_fields
+
+for field in unknown_fields(plan):
+    print(field)   # plan.resources[0].maxWorkingDurationn  (did you mean maxWorkingDuration?)
+```
+
 Responses are never affected: a key the API adds is kept, not refused.
 
 All of them are importable from `kardinal` itself
@@ -267,9 +282,11 @@ except KardinalLimitError as e:
 ```
 
 `KardinalRateLimitError` (429) signals a temporary overload, not a quota: it
-comes with an empty body and no `Retry-After` header. Reads, `update()`,
-`delete()`, `start()`, `stop()` and `wait()` retry it automatically;
-`submit()` doesn't, so retry it yourself after a pause.
+comes with an empty body and, today, no `Retry-After` header — the SDK
+honours one if the API ever sends it, and otherwise backs off on a jittered
+schedule of its own. Reads, `update()`, `delete()`, `start()`, `stop()` and
+`wait()` retry it automatically; `submit()` doesn't, so retry it yourself
+after a pause.
 
 `.retryable` is computed by the SDK and means "retrying is safe and may
 succeed": true for a `429`, and for a `5xx` or a connection error, except

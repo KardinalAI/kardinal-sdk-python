@@ -147,7 +147,7 @@ class Transport:
                 method, status=response.status_code, network_error=False
             ):
                 attempt += 1
-                retry.sleep(attempt)
+                retry.sleep(attempt, response.headers.get("Retry-After"))
                 continue
             raise self._error_for(response, method)
 

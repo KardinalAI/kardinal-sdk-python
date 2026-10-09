@@ -163,7 +163,7 @@ class StopKind(Enum):
     """
     Generic operation label from the resource's own point of view. It sets how the stop's `capacities` affect the resource's load: added for `pickup`, deducted for `delivery`, ignored for `acknowledgement` (an intervention with no cargo exchange).
 
-    > **Modelling pitfall.** Not a guarantee of real-world physical direction. The real direction goods move is carried by the sign of `capacities`, not by `kind`: a dataset can use `kind: "pickup"` on every stop and still model both collections and drop-offs correctly by flipping the sign of `capacities` instead.
+    > **Modelling pitfall.** A negative quantity reverses the effect: a `delivery` of `-100` has the same effect as a `pickup` of `100`. A `delivery` whose order has no `pickup` is assumed loaded at departure.
 
     """
 
@@ -400,7 +400,7 @@ class Capacities(RootModel[Dict[str, float]]):
 
     > **When to use.** For a vehicle carrying exactly one item at a time whose size varies by trip, a count-based ceiling (`{"containers": 1}`) is robust to size variance; a size-based ceiling (`{"volume": <max item size>}`) is needed only when overflow or partial-load reporting matters.
 
-    > **Modelling pitfall.** Capacity keys are matched by exact string, with no case-folding. A typo such as `weight` on a resource against `Weight` on a stop raises no error: it silently leaves that dimension unlimited for the stop instead of enforcing the resource's ceiling, and `costsByCapacity` ignores the undeclared key.
+    > **Modelling pitfall.** Capacity keys are matched by exact string, with no case-folding. A typo such as `weight` on a resource against `Weight` on a stop raises no error: it silently leaves that dimension unlimited for the stop instead of enforcing the resource's ceiling.
 
     """
 
@@ -2508,7 +2508,7 @@ class TaggedCostFloorsAndCoeffs(CostFloorsAndCoeffs):
     )
     stopTags: Optional[List[RegexIdValidation]] = Field(
         None,
-        description='Stop tags this cost applies to.\n\n> **Default.** If empty or omitted, the cost applies regardless of stop tag.\n',
+        description='Stop tags this cost applies to.\n\n> **Default.** If empty or omitted, the cost applies regardless of stop tag.\n\n> **Modelling pitfall.** A tag that no stop carries makes the cost zero, with no error. Floors apply to the total of the matching stops only.\n',
         examples=[['warehouse', 'stop']],
     )
 
@@ -2544,7 +2544,7 @@ class Cost(BaseModel):
     )
     costsByCapacity: Optional[Dict[str, TaggedCostFloorsAndCoeffs]] = Field(
         None,
-        description="Additional cost floors and coefficients on the resource's load, by capacity name, further scoped to specific stop tags.\n\n> **Modelling pitfall.** Only applies to a capacity declared on the resource as well as on the stops; an undeclared key is silently ignored. The cost is computed on the resource's peak load for that capacity over the tour, and a guaranteed minimum comes from `constantCost`, not `costFloor`.\n",
+        description="Additional cost floors and coefficients on the quantities handled at the tour's stops, by capacity name, further scoped to specific stop tags. Each stop adds the absolute value of its quantity, whatever its `kind` or sign, and floors apply once to the tour total.\n\n> **Modelling pitfall.** The base is the quantity handled, not the vehicle's load: loading at departure doesn't count, and a pickup and a delivery of the same 100 units count 200. It applies to any capacity the stops carry, declared on the resource or not, and a guaranteed minimum comes from `constantCost`, not `costFloor`.\n",
         examples=[{'weight': {'stopTags': ['warehouse'], 'costCoeff': 0.1}}],
     )
     costPerCapacityPerTravelledKm: Optional[Dict[str, CostFloorsAndCoeffs]] = Field(
