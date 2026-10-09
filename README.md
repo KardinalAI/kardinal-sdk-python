@@ -223,6 +223,11 @@ does. On a plan this SDK didn't read from the API (built by hand, or loaded
 from a file) there is nothing to sort by, so it only warns, and only for a
 key within two edits of a real field.
 
+The CLI works the same way: `plans update` reads the stored plan first to
+borrow its provenance, so a typo in an edited file is refused rather than sent.
+And `--allow-unknown NAME`, repeatable, is the command-line form of `allowUnknown`
+on `plans submit`, `plans update` and `plans validate`.
+
 If the API gains a field before this SDK knows it, name it to send it
 anyway — everything else stays checked:
 

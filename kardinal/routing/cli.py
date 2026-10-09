@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 import typer
 from pydantic import ValidationError
@@ -42,6 +42,11 @@ def _client():
 @plans.command("submit")
 def plans_submit(
     file: Path = typer.Argument(..., exists=True, help="JSON file with the plan."),
+    allow_unknown: List[str] = typer.Option(
+        [],
+        "--allow-unknown",
+        help="Send a field this SDK version doesn't know. Repeatable.",
+    ),
     json_out: bool = typer.Option(False, "--json", help="Force JSON output."),
 ) -> None:
     """Submit a new plan and start optimization. Billed in full."""
@@ -50,7 +55,7 @@ def plans_submit(
     try:
         plan = PlanCreate.model_validate_json(file.read_text())
         with _client() as client:
-            created = client.routing.plans.submit(plan)
+            created = client.routing.plans.submit(plan, allow_unknown=allow_unknown)
     except ValidationError as exc:
         emit(
             [
@@ -82,6 +87,11 @@ def plans_update(
         ..., exists=True, help="JSON file with the full plan, including its id."
     ),
     force: bool = typer.Option(False, "--force", help="Unarchive the plan first, if archived."),
+    allow_unknown: List[str] = typer.Option(
+        [],
+        "--allow-unknown",
+        help="Send a field this SDK version doesn't know. Repeatable.",
+    ),
     json_out: bool = typer.Option(False, "--json", help="Force JSON output."),
 ) -> None:
     """Update a plan. Re-optimizes if needed; only new unique stops are billed."""
@@ -90,12 +100,32 @@ def plans_update(
     try:
         plan = Plan.model_validate_json(file.read_text())
         with _client() as client:
+            # `plans get` -> edit the JSON -> `plans update` is the common
+            # CLI round trip, and a plan read from a file carries none of the
+            # provenance `update()` needs, so a typo is only guessed at from
+            # resemblance. Read the stored plan first and lend its provenance
+            # to this one: the keys the server sends are the same whichever
+            # version answers, so a stale read costs nothing, and a plan the
+            # server doesn't have simply leaves the weaker check in place.
+            try:
+                stored = client.routing.plans.get(plan.id)
+                plan._server_keys = stored._server_keys
+                plan._from_server = stored._from_server
+            except Exception:  # noqa: BLE001 — see below
+                # Deliberately everything: this read only sharpens a check
+                # the command already performs without it. A plan the server
+                # doesn't have, an unreachable network, anything at all —
+                # none of it is a reason to refuse an update the caller
+                # asked for. The weaker near-miss check stays in place.
+                pass
             # A plan from a file carries no provenance, so update() can only
             # warn on what resembles a real field. Shown in the CLI's own
             # format rather than as a raw Python warning on stderr.
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
-                updated = client.routing.plans.update(plan, force=force)
+                updated = client.routing.plans.update(
+                    plan, force=force, allow_unknown=allow_unknown
+                )
             for warning in caught:
                 if issubclass(warning.category, UnknownFieldWarning):
                     typer.secho(f"warning: {warning.message}", err=True, fg=typer.colors.YELLOW)
@@ -204,6 +234,11 @@ def plans_status(plan_id: str, json_out: bool = typer.Option(False, "--json", he
 @plans.command("validate")
 def plans_validate(
     file: Path = typer.Argument(..., exists=True, help="JSON file with the plan."),
+    allow_unknown: List[str] = typer.Option(
+        [],
+        "--allow-unknown",
+        help="Send a field this SDK version doesn't know. Repeatable.",
+    ),
 ) -> None:
     """Validate a plan locally. No API call, no credits consumed."""
     from .plans import PlanCreate
@@ -223,7 +258,7 @@ def plans_validate(
         raise typer.Exit(Exit.BUSINESS_ERROR)
     # Same checks as submit(), or this command would answer OK to a plan
     # submit() goes on to refuse.
-    unknown = unknown_fields(plan)
+    unknown = [f for f in unknown_fields(plan) if f.key not in set(allow_unknown)]
     if unknown:
         emit(
             [

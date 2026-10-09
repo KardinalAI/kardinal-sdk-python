@@ -307,6 +307,10 @@ def test_plans_get() -> None:
 
 @respx.mock
 def test_plans_update(tmp_path) -> None:
+    # The command reads the stored plan first, to borrow its provenance.
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": []}})
+    )
     respx.put(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
         return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": []}})
     )
@@ -573,3 +577,109 @@ def test_plans_update_does_not_swallow_an_unrelated_warning(tmp_path, monkeypatc
 
     assert result.exit_code == 0, result.stdout
     assert [str(w.message) for w in seen] == ["something else entirely"]
+
+
+_RESOURCE = {
+    "id": "r1",
+    "vehicleProfile": {"type": "car"},
+    "workingTimeWindow": {"begin": "2026-10-10T08:00:00Z", "end": "2026-10-10T18:00:00Z"},
+}
+
+
+@respx.mock
+def test_plans_update_refuses_a_typo_a_file_gave_no_provenance_for(tmp_path) -> None:
+    """`plans get` -> edit -> `plans update` is the common CLI round trip.
+    `maxWorkDuration` is three edits from the real field, so resemblance
+    alone says nothing; only the stored plan can tell it from a field the
+    API added.
+    """
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": [_RESOURCE]}})
+    )
+    put = respx.put(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": []}})
+    )
+    plan_file = tmp_path / "plan.json"
+    plan_file.write_text(
+        json.dumps({"id": _PLAN_ID, "resources": [{**_RESOURCE, "maxWorkDuration": "PT8H"}]})
+    )
+
+    result = runner.invoke(
+        app, ["routing", "plans", "update", str(plan_file)], env={"KARDINAL_API_KEY": "test-key"}
+    )
+    assert result.exit_code == 1, result.stdout
+    assert "maxWorkDuration" in result.stdout
+    assert not put.called, "the plan was sent despite the typo"
+
+
+@respx.mock
+def test_plans_update_still_sends_a_field_the_server_itself_returned(tmp_path) -> None:
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(
+            200,
+            json={"item": {"id": _PLAN_ID, "resources": [{**_RESOURCE, "addedByTheApi": "x"}]}},
+        )
+    )
+    put = respx.put(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": []}})
+    )
+    plan_file = tmp_path / "plan.json"
+    plan_file.write_text(
+        json.dumps({"id": _PLAN_ID, "resources": [{**_RESOURCE, "addedByTheApi": "x"}]})
+    )
+
+    result = runner.invoke(
+        app, ["routing", "plans", "update", str(plan_file)], env={"KARDINAL_API_KEY": "test-key"}
+    )
+    assert result.exit_code == 0, result.stdout
+    assert json.loads(put.calls.last.request.content)["resources"][0]["addedByTheApi"] == "x"
+
+
+@respx.mock
+def test_plans_update_proceeds_when_the_stored_plan_cannot_be_read(tmp_path) -> None:
+    # The extra read only sharpens the check. Losing it must not cost the
+    # update the caller asked for.
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(500, json={"errors": [{"code": "INTERNAL_SERVER_ERROR"}]})
+    )
+    respx.put(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": []}})
+    )
+    plan_file = tmp_path / "plan.json"
+    plan_file.write_text(json.dumps({"id": _PLAN_ID, "resources": [_RESOURCE]}))
+
+    result = runner.invoke(
+        app, ["routing", "plans", "update", str(plan_file)], env={"KARDINAL_API_KEY": "test-key"}
+    )
+    assert result.exit_code == 0, result.stdout
+
+
+@respx.mock
+def test_allow_unknown_lets_submit_send_a_field_this_version_does_not_know(tmp_path) -> None:
+    post = respx.post(f"{DEFAULT_BASE_URL}/plans").mock(
+        return_value=httpx.Response(201, json={"item": {"id": _PLAN_ID, "resources": []}})
+    )
+    plan_file = tmp_path / "plan.json"
+    plan_file.write_text(json.dumps({"resources": [{**_RESOURCE, "aNewApiField": "x"}]}))
+    args = ["routing", "plans", "submit", str(plan_file)]
+
+    refused = runner.invoke(app, args, env={"KARDINAL_API_KEY": "test-key"})
+    assert refused.exit_code == 1
+    assert not post.called
+
+    allowed = runner.invoke(
+        app, [*args, "--allow-unknown", "aNewApiField"], env={"KARDINAL_API_KEY": "test-key"}
+    )
+    assert allowed.exit_code == 0, allowed.stdout
+    assert json.loads(post.calls.last.request.content)["resources"][0]["aNewApiField"] == "x"
+
+
+def test_allow_unknown_makes_validate_agree_with_submit(tmp_path) -> None:
+    plan_file = tmp_path / "plan.json"
+    plan_file.write_text(json.dumps({"resources": [{**_RESOURCE, "aNewApiField": "x"}]}))
+    args = ["routing", "plans", "validate", str(plan_file)]
+
+    assert runner.invoke(app, args).exit_code == 1
+    ok = runner.invoke(app, [*args, "--allow-unknown", "aNewApiField"])
+    assert ok.exit_code == 0, ok.stdout
+    assert "OK" in ok.stdout
