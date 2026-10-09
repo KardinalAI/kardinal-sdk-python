@@ -225,7 +225,7 @@ key within two edits of a real field.
 
 The CLI works the same way: `plans update` reads the stored plan first to
 borrow its provenance, so a typo in an edited file is refused rather than sent.
-And `--allow-unknown NAME`, repeatable, is the command-line form of `allowUnknown`
+And `--allow-unknown NAME`, repeatable, is the command-line form of `allow_unknown`
 on `plans submit`, `plans update` and `plans validate`.
 
 If the API gains a field before this SDK knows it, name it to send it
