@@ -69,7 +69,7 @@ def init() -> None:
         "plan = k.routing.plans.submit(examples.small_delivery_plan())\n"
         "solution = k.routing.solutions.wait(plan.id)\n"
         "```\n\n"
-        "Documentation: https://pypi.org/project/kardinal-ai/ "
+        "Documentation: https://developers.kardinal.ai/sdks/quickstart "
         "(or run `kardinal --help`).\n"
     )
     typer.echo(f"Wrote {target}")

@@ -15,7 +15,8 @@ or later.
 The package ships its types, so a type checker sees them: a misspelled attribute
 or a wrong argument type is reported in your editor, before anything runs.
 
-API documentation: https://developers.kardinal.ai
+Documentation: https://developers.kardinal.ai/sdks/overview (SDK guides and reference)
+and https://developers.kardinal.ai (the API itself).
 
 ## Quickstart
 
