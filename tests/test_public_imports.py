@@ -1,5 +1,5 @@
 """Everything user code needs is importable from `kardinal` itself — no
-`kardinal._core` in anything shown to users (P2).
+`kardinal._core` in anything shown to users.
 """
 
 import subprocess

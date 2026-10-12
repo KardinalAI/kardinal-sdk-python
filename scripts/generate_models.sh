@@ -37,7 +37,7 @@ rm -f "$OUTPUT.bak"
 # Python versions/environments, even though the set of classes is — call
 # order doesn't matter here (each call is independent), so sort the block
 # to make the output byte-identical everywhere. Without this, the CI "no
-# diff" check (§9) can fail on a pipeline even when nothing meaningful
+# diff" check (tests/test_models_no_diff.py) can fail on a pipeline even when nothing meaningful
 # changed, purely because it ran on a different Python build than whoever
 # last committed the file.
 python3 - "$OUTPUT" <<'PY'

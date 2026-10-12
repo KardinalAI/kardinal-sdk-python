@@ -1,5 +1,5 @@
 """The README becomes the pypi.org page and docstrings show up in `help()`:
-neither may carry internal details or claims we haven't verified (P6).
+neither may carry internal details or claims we haven't verified.
 """
 
 import re
@@ -54,6 +54,7 @@ _FORBIDDEN_ANYWHERE = [
     r"public-docs",
     r"guidelines",
     r"aropy",
+    r"ebirah",
     r"sk-[a-z0-9]",
 ]
 _EXCLUDED = {"spec/openapi.yaml", "kardinal/routing/models/__init__.py", "tests/test_public_text.py"}

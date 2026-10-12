@@ -202,10 +202,10 @@ KardinalError
 ```
 
 `UnknownFieldError` is the one raised without a request being made. Most
-plan fields are optional, so a misspelled one used to be dropped in silence
-by the SDK, then by the API: `operationDurationn` left the stop with no
-service time, `requiredSkills` spelled wrong let any resource serve the
-order, and the plan came back valid. `submit()` now lists every such key
+plan fields are optional, and the API drops a key it doesn't know without
+an error: `operationDurationn` would leave the stop with no service time,
+`requiredSkills` spelled wrong would let any resource serve the order, and
+the plan would still come back valid. So `submit()` lists every such key
 with its path and refuses to send:
 
 ```

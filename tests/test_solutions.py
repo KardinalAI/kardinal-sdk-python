@@ -158,7 +158,7 @@ def test_wait_rejects_a_solution_left_over_from_the_previous_version(clock) -> N
 
 @respx.mock
 def test_wait_after_stopped_waits_for_interrupted_while_the_solution_improves(clock) -> None:
-    """Stopped mid-optimization: Ebirah still has to stop, then reports
+    """Stopped mid-optimization: the engine still has to stop, then reports
     `interrupted` — the solution can still improve in between.
     """
     _mock_plan()
@@ -246,7 +246,7 @@ def test_wait_raises_not_found_on_the_deleted_state(clock) -> None:
 
 @respx.mock
 def test_wait_raises_stalled_when_optimizing_outlasts_its_budget_by_five_minutes(clock) -> None:
-    """Ebirah crashed: nothing will ever move the state off `optimizing`."""
+    """The engine crashed: nothing will ever move the state off `optimizing`."""
     _mock_plan(budget="PT5S")
     _mock_states(clock, [(0, "processing", 1), (20, "optimizing", 1)])
     _, solutions = _apis()
