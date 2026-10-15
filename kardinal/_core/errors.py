@@ -19,7 +19,7 @@ silently amended, and *then* something else failed validation".
 and `details` the `properties.details` of the error that `code` came from:
 the only way to tell apart errors sharing a code — every limit (plan size,
 daily quota, exhausted credits) is `403 NOT_ALLOWED`, and so are a revoked
-key and an archived plan updated without `force` (which `from_response`
+key and an archived plan updated, stopped or restarted without `force` (which `from_response`
 tells apart by this very text), and two `404
 NOT_FOUND` differ only by it ("Plan not found" vs. "Solution version not
 found."). Both are empty for client-side errors and for a 429, which
