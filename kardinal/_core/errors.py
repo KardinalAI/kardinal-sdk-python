@@ -82,7 +82,7 @@ class KardinalLimitError(KardinalError):
 
     Two 403s that are not limits are recognised by their exact `.details`
     and raised as another family: a revoked key (`KardinalAuthError`) and an
-    archived plan updated without `force` (`KardinalValidationError`). The
+    archived plan updated, stopped or restarted without `force` (`KardinalValidationError`). The
     fallback means other 403s, such as a rejected scope or claim, still
     land here: don't assume that every 403 left in this class is a limit.
 

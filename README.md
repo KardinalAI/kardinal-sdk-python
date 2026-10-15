@@ -192,7 +192,7 @@ KardinalError
 ├── KardinalLimitError          403 (NOT_ALLOWED): plan-size limit, optimization quota,
 │                               or insufficient credits
 ├── KardinalValidationError     the 7 codes under 400, with the full error list; also an
-│                               archived plan updated without `force` (403 NOT_ALLOWED)
+│                               archived plan updated, stopped or restarted without `force` (403 NOT_ALLOWED)
 ├── KardinalNotFoundError       NOT_FOUND: raised on every 404, including reads
 ├── KardinalRateLimitError      429: temporary overload, retry after a pause
 ├── KardinalServerError         INTERNAL_SERVER_ERROR, or any other 5xx
