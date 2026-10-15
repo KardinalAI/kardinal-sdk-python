@@ -245,7 +245,6 @@ def test_the_envelope_warnings_reach_the_error() -> None:
     assert exc.warnings == warnings
 
 
-
 def _not_allowed(details: str) -> list:
     return [{"code": "NOT_ALLOWED", "message": "boom", "properties": {"details": details}}]
 
@@ -292,5 +291,11 @@ def test_a_plan_size_limit_is_still_a_limit_error() -> None:
         {"code": "INVALID_VALUE", "message": "x", "properties": {"path": "a", "details": "too many"}},
         {"code": "NOT_ALLOWED", "message": "x", "properties": {"details": "plan size"}},
     ]
+    exc = from_response(status=403, request_id=None, errors=errors)
+    assert isinstance(exc, KardinalLimitError)
+
+
+def test_the_exact_text_under_another_code_is_still_a_limit_error() -> None:
+    errors = [{"code": "INVALID_VALUE", "message": "x", "properties": {"details": "the token is invalid"}}]
     exc = from_response(status=403, request_id=None, errors=errors)
     assert isinstance(exc, KardinalLimitError)

@@ -83,8 +83,7 @@ class KardinalLimitError(KardinalError):
     Two 403s that are not limits are recognised by their exact `.details`
     and raised as another family: a revoked key (`KardinalAuthError`) and an
     archived plan updated without `force` (`KardinalValidationError`). The
-    fallback means other 403s, such as the two other paths of the
-    authentication library (an invalid scope, failed claim checks), still
+    fallback means other 403s, such as a rejected scope or claim, still
     land here: don't assume that every 403 left in this class is a limit.
 
     `.details` says which limit. For a plan-size limit, `.errors` also has
@@ -220,11 +219,9 @@ _AUTH_CODES = frozenset({"NOT_AUTHENTICATED"})
 # and tells them apart only by `properties.details`, so the match is on the
 # exact text; if the backend rewords one, the error falls back to
 # `KardinalLimitError`, as before.
-# Revoked or regenerated token: coretech/go-jwt, client/base.go
-# (`abortWithStatusForbidden`).
+# Revoked or regenerated key.
 _REVOKED_TOKEN_DETAILS = "the token is invalid"
-# Archived plan without `force`: coretech/phoebe, manager/plan_manager.go
-# (`validateAndUpdatePlan` and `UpdateRunning`).
+# Archived plan updated, stopped or restarted without `force`.
 _ARCHIVED_PLAN_DETAILS = "Cannot update an archived plan, except with the 'force' query param"
 
 
