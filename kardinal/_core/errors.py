@@ -18,7 +18,9 @@ silently amended, and *then* something else failed validation".
 `errors` is every `Error` object of the response envelope, on every family,
 and `details` the `properties.details` of the error that `code` came from:
 the only way to tell apart errors sharing a code — every limit (plan size,
-daily quota, exhausted credits) is `403 NOT_ALLOWED`, and two `404
+daily quota, exhausted credits) is `403 NOT_ALLOWED`, and so are a revoked
+key and an archived plan updated without `force` (which `from_response`
+tells apart by this very text), and two `404
 NOT_FOUND` differ only by it ("Plan not found" vs. "Solution version not
 found."). Both are empty for client-side errors and for a 429, which
 carries no envelope.
@@ -63,17 +65,27 @@ class KardinalError(Exception):
 
 
 class KardinalAuthError(KardinalError):
-    """`NOT_AUTHENTICATED` (401): the API key is missing, malformed, or
-    expired, or was issued for another environment.
+    """The API key is missing, malformed, expired, revoked or regenerated, or
+    was issued for another environment.
+
+    Two statuses carry it: `NOT_AUTHENTICATED` (401) for a missing, malformed
+    or expired key, and 403 `NOT_ALLOWED` with `.details` `the token is
+    invalid` for a key that was revoked or regenerated.
     """
 
 
 class KardinalLimitError(KardinalError):
-    """Any 403 (`NOT_ALLOWED`): a limit of the agency was hit — a plan-size
+    """A 403 (`NOT_ALLOWED`) that is a limit of the agency — a plan-size
     limit (resources, orders, stops, stops per order without
     `successiveStops`), the daily/monthly optimization quota, or exhausted
-    credits. For a builder account there's no other kind of 403 (confirmed
-    by the backend team): it never means a permission refusal.
+    credits — and, as a fallback, any 403 this SDK doesn't recognise.
+
+    Two 403s that are not limits are recognised by their exact `.details`
+    and raised as another family: a revoked key (`KardinalAuthError`) and an
+    archived plan updated without `force` (`KardinalValidationError`). The
+    fallback means other 403s, such as the two other paths of the
+    authentication library (an invalid scope, failed claim checks), still
+    land here: don't assume that every 403 left in this class is a limit.
 
     `.details` says which limit. For a plan-size limit, `.errors` also has
     an `INVALID_VALUE` entry, placed first by the API, whose
@@ -84,10 +96,14 @@ class KardinalLimitError(KardinalError):
 
 
 class KardinalValidationError(KardinalError):
-    """One of the 7 business codes returned under 400.
+    """One of the 7 business codes returned under 400, or an archived plan
+    updated, stopped or restarted without `force` (403 `NOT_ALLOWED`, with
+    `.details` `Cannot update an archived plan, except with the 'force' query
+    param`: add `force=True`).
 
     A single 400 can report several invalid fields at once: `.errors` has
-    them all, not just the first.
+    them all, not just the first. The archived-plan 403 is different: its
+    `.errors` holds one `NOT_ALLOWED` error with no field path.
     """
 
 
@@ -200,6 +216,17 @@ _VALIDATION_CODES = frozenset(
 )
 _AUTH_CODES = frozenset({"NOT_AUTHENTICATED"})
 
+# The two 403s that are not limits. The backend answers both with `NOT_ALLOWED`
+# and tells them apart only by `properties.details`, so the match is on the
+# exact text; if the backend rewords one, the error falls back to
+# `KardinalLimitError`, as before.
+# Revoked or regenerated token: coretech/go-jwt, client/base.go
+# (`abortWithStatusForbidden`).
+_REVOKED_TOKEN_DETAILS = "the token is invalid"
+# Archived plan without `force`: coretech/phoebe, manager/plan_manager.go
+# (`validateAndUpdatePlan` and `UpdateRunning`).
+_ARCHIVED_PLAN_DETAILS = "Cannot update an archived plan, except with the 'force' query param"
+
 
 def _family_for_status(status: int) -> type:
     if status == 401:
@@ -243,7 +270,12 @@ def from_response(
     retryable = status == 429 or (status >= 500 and method.upper() != "POST")
 
     family: Type[KardinalError]
-    if status == 403:
+    details = ((primary or {}).get("properties") or {}).get("details")
+    if status == 403 and code == "NOT_ALLOWED" and details == _REVOKED_TOKEN_DETAILS:
+        family = KardinalAuthError
+    elif status == 403 and code == "NOT_ALLOWED" and details == _ARCHIVED_PLAN_DETAILS:
+        family = KardinalValidationError
+    elif status == 403:
         family = KardinalLimitError
     elif code in _AUTH_CODES:
         family = KardinalAuthError

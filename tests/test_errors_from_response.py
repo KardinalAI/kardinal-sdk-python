@@ -23,9 +23,9 @@ def test_not_authenticated_maps_to_kardinal_auth_error() -> None:
 
 
 def test_not_allowed_maps_to_kardinal_limit_error() -> None:
-    """For a builder account, NOT_ALLOWED only ever means a limit was hit —
-    plan size, optimization quota, or exhausted credits (confirmed by the
-    backend team): there's no permission refusal to confuse it with.
+    """A NOT_ALLOWED with no recognised `details` is a limit (plan size,
+    optimization quota, exhausted credits): the fallback for every 403 that
+    is not one of the two exact messages tested at the end of this file.
     """
     exc = from_response(status=403, request_id=None, errors=_error("NOT_ALLOWED"))
     assert isinstance(exc, KardinalLimitError)
@@ -244,3 +244,53 @@ def test_the_envelope_warnings_reach_the_error() -> None:
     exc = from_response(status=400, request_id=None, errors=_error("INVALID_VALUE"), warnings=warnings)
     assert exc.warnings == warnings
 
+
+
+def _not_allowed(details: str) -> list:
+    return [{"code": "NOT_ALLOWED", "message": "boom", "properties": {"details": details}}]
+
+
+def test_a_revoked_key_is_an_auth_error_not_a_limit_error() -> None:
+    """The backend answers a revoked or regenerated token with 403
+    NOT_ALLOWED and this exact `details`: it is a key problem, not a limit.
+    """
+    exc = from_response(status=403, request_id=None, errors=_not_allowed("the token is invalid"))
+    assert isinstance(exc, KardinalAuthError)
+    assert not isinstance(exc, KardinalLimitError)
+    assert exc.status == 403
+    assert exc.code == "NOT_ALLOWED"
+    assert exc.details == "the token is invalid"
+
+
+def test_an_archived_plan_without_force_is_a_validation_error() -> None:
+    """The fix is in the request (add `force=true`), not a wait or a top-up."""
+    details = "Cannot update an archived plan, except with the 'force' query param"
+    exc = from_response(status=403, request_id=None, errors=_not_allowed(details))
+    assert isinstance(exc, KardinalValidationError)
+    assert not isinstance(exc, KardinalLimitError)
+    assert exc.status == 403
+    assert exc.code == "NOT_ALLOWED"
+    assert exc.details == details
+
+
+@pytest.mark.parametrize(
+    "details",
+    [
+        "Insufficient credits",
+        "The maximum number of optimizations per day (1500) has been reached for agency x",
+        "the token is invalid, really",  # exact match only, never "contains"
+        "Cannot update an archived plan",
+    ],
+)
+def test_other_403_details_are_still_limit_errors(details: str) -> None:
+    exc = from_response(status=403, request_id=None, errors=_not_allowed(details))
+    assert isinstance(exc, KardinalLimitError)
+
+
+def test_a_plan_size_limit_is_still_a_limit_error() -> None:
+    errors = [
+        {"code": "INVALID_VALUE", "message": "x", "properties": {"path": "a", "details": "too many"}},
+        {"code": "NOT_ALLOWED", "message": "x", "properties": {"details": "plan size"}},
+    ]
+    exc = from_response(status=403, request_id=None, errors=errors)
+    assert isinstance(exc, KardinalLimitError)

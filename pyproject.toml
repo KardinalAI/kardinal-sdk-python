@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kardinal-ai"
-version = "1.0.0"
+version = "1.1.0"
 description = "Kardinal Python SDK: route optimization plans and solutions."
 readme = "README.md"
 requires-python = ">=3.10"

@@ -187,10 +187,12 @@ its delivery).
 
 ```
 KardinalError
-├── KardinalAuthError           NOT_AUTHENTICATED (401): missing, invalid or expired key
-├── KardinalLimitError          any 403 (NOT_ALLOWED): plan-size limit, optimization quota,
+├── KardinalAuthError           NOT_AUTHENTICATED (401): missing, invalid or expired key;
+│                               also a revoked or regenerated key (403 NOT_ALLOWED)
+├── KardinalLimitError          403 (NOT_ALLOWED): plan-size limit, optimization quota,
 │                               or insufficient credits
-├── KardinalValidationError     the 7 codes under 400, with the full error list
+├── KardinalValidationError     the 7 codes under 400, with the full error list; also an
+│                               archived plan updated without `force` (403 NOT_ALLOWED)
 ├── KardinalNotFoundError       NOT_FOUND: raised on every 404, including reads
 ├── KardinalRateLimitError      429: temporary overload, retry after a pause
 ├── KardinalServerError         INTERNAL_SERVER_ERROR, or any other 5xx
@@ -263,9 +265,13 @@ Every exception carries `.code`, `.status`, `.request_id`, `.retryable`,
 the response; `.details` is the `properties.details` of the error `.code`
 came from, the only way to tell apart errors that share a code.
 
-`KardinalLimitError` is what every 403 becomes: for a builder account, a
-403 always means a limit was hit, never a permission refusal. `.details`
-says which one. For a plan-size limit (too many resources, orders or
+`KardinalLimitError` is what a 403 becomes when a limit was hit. `.details`
+says which one. Two 403s that are not limits are recognised by their exact
+`.details` and raised as another family: `the token is invalid` (a revoked or
+regenerated key) raises `KardinalAuthError`, and `Cannot update an archived
+plan, except with the 'force' query param` raises `KardinalValidationError`
+(its `.errors` has no field path: add `force=True`). Any other 403 still
+raises `KardinalLimitError`. For a plan-size limit (too many resources, orders or
 stops, or more than 4 stops in an order without `successiveStops`),
 `.errors` also holds one `INVALID_VALUE` entry per exceeded limit, whose
 `properties.path` and `properties.details` name the field and the allowed
