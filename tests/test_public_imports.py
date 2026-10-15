@@ -14,6 +14,7 @@ _PUBLIC = {
     "KardinalError": errors.KardinalError,
     "KardinalAuthError": errors.KardinalAuthError,
     "KardinalLimitError": errors.KardinalLimitError,
+    "KardinalForbiddenError": errors.KardinalForbiddenError,
     "KardinalValidationError": errors.KardinalValidationError,
     "KardinalNotFoundError": errors.KardinalNotFoundError,
     "KardinalRateLimitError": errors.KardinalRateLimitError,

@@ -19,10 +19,11 @@ silently amended, and *then* something else failed validation".
 and `details` the `properties.details` of the error that `code` came from:
 the only way to tell apart errors sharing a code — every limit (plan size,
 daily quota, exhausted credits) is `403 NOT_ALLOWED`, and so are a revoked
-key and an archived plan updated, stopped or restarted without `force` (which `from_response`
-tells apart by this very text), and two `404
-NOT_FOUND` differ only by it ("Plan not found" vs. "Solution version not
-found."). Both are empty for client-side errors and for a 429, which
+key and an archived plan updated, stopped or restarted without `force`.
+`from_response` sorts a 403 into a family from these texts and from the
+fields the API adds next to them, and raises `KardinalForbiddenError` for a
+403 it can't sort. Two `404 NOT_FOUND` also differ only by `details` ("Plan
+not found" vs. "Solution version not found."). Both are empty for client-side errors and for a 429, which
 carries no envelope.
 """
 
@@ -75,22 +76,35 @@ class KardinalAuthError(KardinalError):
 
 
 class KardinalLimitError(KardinalError):
-    """A 403 (`NOT_ALLOWED`) that is a limit of the agency — a plan-size
-    limit (resources, orders, stops, stops per order without
+    """A 403 (`NOT_ALLOWED`) recognised as a limit of the agency — a
+    plan-size limit (resources, orders, stops, stops per order without
     `successiveStops`), the daily/monthly optimization quota, or exhausted
-    credits — and, as a fallback, any 403 this SDK doesn't recognise.
+    credits.
 
-    Two 403s that are not limits are recognised by their exact `.details`
-    and raised as another family: a revoked key (`KardinalAuthError`) and an
-    archived plan updated, stopped or restarted without `force` (`KardinalValidationError`). The
-    fallback means other 403s, such as a rejected scope or claim, still
-    land here: don't assume that every 403 left in this class is a limit.
+    A 403 is a limit when the response carries one of their clues: an
+    `INVALID_VALUE` entry (plan size), a `remaining` balance or the text
+    `Insufficient credits` (credits), the quota message or the summary
+    `The resulting plan violates the quotas configuration of the agency`
+    that follows a plan-size or quota error. Several clues per limit, so one
+    reworded message doesn't hide it. A 403 with none of them is a
+    `KardinalForbiddenError`, never a limit.
 
     `.details` says which limit. For a plan-size limit, `.errors` also has
     an `INVALID_VALUE` entry, placed first by the API, whose
     `properties.path` and `properties.details` name the field and the
-    allowed value. Classified on the 403 status rather than on a code, so
-    finer codes the API may add under 403 land here too.
+    allowed value.
+    """
+
+
+class KardinalForbiddenError(KardinalError):
+    """A 403 this SDK can't classify: none of the clues of a limit, and
+    neither a revoked key nor an archived plan. Read `.details` and
+    `.errors`, which hold the API's explanation as is.
+
+    It covers 403s that a builder key isn't expected to get (a rejected
+    scope or claim), and a limit or a known case whose text the API has
+    reworded since this SDK version. Never retried: the same request gets
+    the same answer.
     """
 
 
@@ -218,11 +232,41 @@ _AUTH_CODES = frozenset({"NOT_AUTHENTICATED"})
 # The two 403s that are not limits. The backend answers both with `NOT_ALLOWED`
 # and tells them apart only by `properties.details`, so the match is on the
 # exact text; if the backend rewords one, the error falls back to
-# `KardinalLimitError`, as before.
+# `KardinalForbiddenError`.
 # Revoked or regenerated key.
 _REVOKED_TOKEN_DETAILS = "the token is invalid"
 # Archived plan updated, stopped or restarted without `force`.
 _ARCHIVED_PLAN_DETAILS = "Cannot update an archived plan, except with the 'force' query param"
+
+# The texts of the limits, on `NOT_ALLOWED` errors. A limit also has a clue
+# that isn't text where the API gives one (an `INVALID_VALUE` entry for a
+# plan size, a `remaining` balance for credits), and the quota has two
+# texts, so that a single reworded message doesn't hide a limit.
+_INSUFFICIENT_CREDITS_DETAILS = "Insufficient credits"
+# Follows every plan-size and quota error.
+_QUOTA_SUMMARY_DETAILS = "The resulting plan violates the quotas configuration of the agency"
+# Followed by "per day (1500) has been reached for agency …" or "per month …".
+_QUOTA_REACHED_PREFIX = "The maximum number of optimizations "
+# An agency whose quota is zero.
+_NO_OPTIMIZATION_ALLOWED_DETAILS = "The agency conf does not allow any optimization call"
+
+
+def _is_limit(errors: List[dict]) -> bool:
+    """Whether a 403's errors carry one of the clues of a limit."""
+    for error in errors:
+        if error.get("code") == "INVALID_VALUE":
+            return True
+        if error.get("code") != "NOT_ALLOWED":
+            continue
+        properties = error.get("properties") or {}
+        details = properties.get("details") or ""
+        if (
+            "remaining" in properties
+            or details in (_INSUFFICIENT_CREDITS_DETAILS, _QUOTA_SUMMARY_DETAILS, _NO_OPTIMIZATION_ALLOWED_DETAILS)
+            or details.startswith(_QUOTA_REACHED_PREFIX)
+        ):
+            return True
+    return False
 
 
 def _family_for_status(status: int) -> type:
@@ -272,8 +316,10 @@ def from_response(
         family = KardinalAuthError
     elif status == 403 and code == "NOT_ALLOWED" and details == _ARCHIVED_PLAN_DETAILS:
         family = KardinalValidationError
-    elif status == 403:
+    elif status == 403 and _is_limit(errors):
         family = KardinalLimitError
+    elif status == 403:
+        family = KardinalForbiddenError
     elif code in _AUTH_CODES:
         family = KardinalAuthError
     elif code in _VALIDATION_CODES:

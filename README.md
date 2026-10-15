@@ -189,8 +189,9 @@ its delivery).
 KardinalError
 ├── KardinalAuthError           NOT_AUTHENTICATED (401): missing, invalid or expired key;
 │                               also a revoked or regenerated key (403 NOT_ALLOWED)
-├── KardinalLimitError          403 (NOT_ALLOWED): plan-size limit, optimization quota,
-│                               or insufficient credits
+├── KardinalLimitError          403 (NOT_ALLOWED) recognised as a limit: plan size,
+│                               optimization quota, or insufficient credits
+├── KardinalForbiddenError      any other 403: read `.details`
 ├── KardinalValidationError     the 7 codes under 400, with the full error list; also an
 │                               archived plan updated, stopped or restarted without `force` (403 NOT_ALLOWED)
 ├── KardinalNotFoundError       NOT_FOUND: raised on every 404, including reads
@@ -265,13 +266,16 @@ Every exception carries `.code`, `.status`, `.request_id`, `.retryable`,
 the response; `.details` is the `properties.details` of the error `.code`
 came from, the only way to tell apart errors that share a code.
 
-`KardinalLimitError` is what a 403 becomes when a limit was hit. `.details`
-says which one. Two 403s that are not limits are recognised by their exact
-`.details` and raised as another family: `the token is invalid` (a revoked or
-regenerated key) raises `KardinalAuthError`, and `Cannot update an archived
-plan, except with the 'force' query param` raises `KardinalValidationError`
-(its `.errors` has no field path: add `force=True`). Any other 403 still
-raises `KardinalLimitError`. For a plan-size limit (too many resources, orders or
+The API answers every refusal with a 403 `NOT_ALLOWED`, so the SDK sorts a
+403 by what the response carries. `KardinalLimitError` is what a 403 becomes
+when a limit was hit, and `.details` says which one. Two 403s that are not
+limits are recognised by their exact `.details` and raised as another
+family: `the token is invalid` (a revoked or regenerated key) raises
+`KardinalAuthError`, and `Cannot update an archived plan, except with the
+'force' query param` raises `KardinalValidationError` (its `.errors` has no
+field path: add `force=True`). Any other 403 raises `KardinalForbiddenError`:
+the SDK couldn't tell what it is, so it doesn't call it a limit, and
+`.details` holds the API's own explanation. For a plan-size limit (too many resources, orders or
 stops, or more than 4 stops in an order without `successiveStops`),
 `.errors` also holds one `INVALID_VALUE` entry per exceeded limit, whose
 `properties.path` and `properties.details` name the field and the allowed

@@ -1,6 +1,7 @@
 from kardinal._core.errors import (
     KardinalAuthError,
     KardinalConnectionError,
+    KardinalForbiddenError,
     KardinalLimitError,
     KardinalNotFoundError,
     KardinalRateLimitError,
@@ -12,6 +13,7 @@ from kardinal._core.errors import (
 _LEAF_CLASSES = [
     KardinalAuthError,
     KardinalLimitError,
+    KardinalForbiddenError,
     KardinalNotFoundError,
     KardinalRateLimitError,
     KardinalServerError,

@@ -3,6 +3,7 @@ import pytest
 from kardinal._core.errors import (
     KardinalAuthError,
     KardinalConnectionError,
+    KardinalForbiddenError,
     KardinalLimitError,
     KardinalNotFoundError,
     KardinalRateLimitError,
@@ -22,22 +23,24 @@ def test_not_authenticated_maps_to_kardinal_auth_error() -> None:
     assert exc.code == "NOT_AUTHENTICATED"
 
 
-def test_not_allowed_maps_to_kardinal_limit_error() -> None:
-    """A NOT_ALLOWED with no recognised `details` is a limit (plan size,
-    optimization quota, exhausted credits): the fallback for every 403 that
-    is not one of the two exact messages tested at the end of this file.
+def test_a_not_allowed_with_no_clue_is_a_forbidden_error() -> None:
+    """A 403 that carries none of the clues of a limit, and isn't one of
+    the two exact messages tested at the end of this file, is a 403 this
+    SDK can't classify: it's never presented as a limit.
     """
     exc = from_response(status=403, request_id=None, errors=_error("NOT_ALLOWED"))
-    assert isinstance(exc, KardinalLimitError)
+    assert isinstance(exc, KardinalForbiddenError)
+    assert not isinstance(exc, KardinalLimitError)
     assert not isinstance(exc, KardinalAuthError)
     assert exc.code == "NOT_ALLOWED"
+    assert exc.retryable is False
 
 
 def test_plan_size_limit_is_a_limit_error_whatever_the_first_error_code() -> None:
     """Observed live: exceeding a plan-size limit returns a 403 whose FIRST
     error is INVALID_VALUE (the field and the limit), followed by the
-    NOT_ALLOWED that makes it a 403. The status decides the family, and
-    `.code`/`.details` come from the error that explains the 403.
+    NOT_ALLOWED that makes it a 403. The INVALID_VALUE entries make it a
+    limit, and `.code`/`.details` come from the error that explains the 403.
     """
     errors = [
         {
@@ -62,9 +65,10 @@ def test_plan_size_limit_is_a_limit_error_whatever_the_first_error_code() -> Non
     assert exc.errors == errors
 
 
-def test_a_future_403_code_is_still_a_limit_error_and_becomes_the_code() -> None:
+def test_a_future_403_code_with_a_limit_clue_is_a_limit_error_and_becomes_the_code() -> None:
     """The backend may add finer codes, still under 403 (e.g. for quotas or
-    credits): they must land in KardinalLimitError without an SDK change.
+    credits): with a clue of a limit, they land in KardinalLimitError
+    without an SDK change.
     """
     errors = [
         {"code": "INVALID_VALUE", "message": "bad", "properties": {"path": "resources"}},
@@ -112,7 +116,7 @@ def test_unrecognized_code_falls_back_to_the_family_matching_http_status() -> No
     ("status", "expected_family"),
     [
         (401, KardinalAuthError),
-        (403, KardinalLimitError),
+        (403, KardinalForbiddenError),  # no clue of a limit in the response
         (404, KardinalNotFoundError),
         (429, KardinalRateLimitError),
         (500, KardinalServerError),
@@ -169,20 +173,28 @@ def test_connection_error_is_not_constructed_by_from_response() -> None:
 
 def test_every_family_carries_the_full_errors_list_and_details() -> None:
     """Every limit (plan size, daily quota, credits) is `403 NOT_ALLOWED`:
-    only `properties.details` tells them apart, so it must reach every
+    `properties.details` tells them apart, so it must reach every
     exception, not just `KardinalValidationError`.
     """
     errors = [
         {
             "code": "NOT_ALLOWED",
             "message": "The requested action is not allowed.",
-            "properties": {"details": "Monthly credit quota exhausted"},
+            "properties": {"details": "Insufficient credits", "remaining": "17"},
         }
     ]
     exc = from_response(status=403, request_id=None, errors=errors)
     assert isinstance(exc, KardinalLimitError)
     assert exc.errors == errors
-    assert exc.details == "Monthly credit quota exhausted"
+    assert exc.details == "Insufficient credits"
+
+
+def test_a_forbidden_error_carries_the_full_errors_list_and_details() -> None:
+    errors = [{"code": "NOT_ALLOWED", "message": "x", "properties": {"details": "Some new reason"}}]
+    exc = from_response(status=403, request_id=None, errors=errors)
+    assert isinstance(exc, KardinalForbiddenError)
+    assert exc.errors == errors
+    assert exc.details == "Some new reason"
 
 
 def test_details_is_none_without_an_error_envelope() -> None:
@@ -273,17 +285,66 @@ def test_an_archived_plan_without_force_is_a_validation_error() -> None:
 
 
 @pytest.mark.parametrize(
-    "details",
+    "errors",
     [
-        "Insufficient credits",
-        "The maximum number of optimizations per day (1500) has been reached for agency x",
-        "the token is invalid, really",  # exact match only, never "contains"
-        "Cannot update an archived plan",
+        # Exhausted credits: the `remaining` balance is enough, whatever the text.
+        [{"code": "NOT_ALLOWED", "message": "x", "properties": {"details": "Insufficient credits", "remaining": "17"}}],
+        [{"code": "NOT_ALLOWED", "message": "x", "properties": {"details": "Reworded", "remaining": "0"}}],
+        [{"code": "NOT_ALLOWED", "message": "x", "properties": {"details": "Insufficient credits"}}],
+        # Optimization quota: its own message, and the summary that always follows it.
+        [
+            {
+                "code": "NOT_ALLOWED",
+                "message": "x",
+                "properties": {
+                    "details": "The maximum number of optimizations per day (1500) has been reached for agency x"
+                },
+            },
+            {
+                "code": "NOT_ALLOWED",
+                "message": "x",
+                "properties": {"details": "The resulting plan violates the quotas configuration of the agency"},
+            },
+        ],
+        # Either clue alone is enough, so one reworded message doesn't hide the limit.
+        [
+            {
+                "code": "NOT_ALLOWED",
+                "message": "x",
+                "properties": {
+                    "details": "The maximum number of optimizations per month (50000) has been reached for agency x"
+                },
+            }
+        ],
+        [
+            {"code": "NOT_ALLOWED", "message": "x", "properties": {"details": "Reworded quota message"}},
+            {
+                "code": "NOT_ALLOWED",
+                "message": "x",
+                "properties": {"details": "The resulting plan violates the quotas configuration of the agency"},
+            },
+        ],
+        [{"code": "NOT_ALLOWED", "message": "x", "properties": {"details": "The agency conf does not allow any optimization call"}}],
     ],
 )
-def test_other_403_details_are_still_limit_errors(details: str) -> None:
-    exc = from_response(status=403, request_id=None, errors=_not_allowed(details))
+def test_the_clues_of_a_limit_make_a_limit_error(errors: list) -> None:
+    exc = from_response(status=403, request_id=None, errors=errors)
     assert isinstance(exc, KardinalLimitError)
+
+
+@pytest.mark.parametrize(
+    "details",
+    [
+        "the token is invalid, really",  # exact match only, never "contains"
+        "Cannot update an archived plan",
+        "The JWT token scope is invalid",
+        "Monthly credit quota exhausted",  # sounds like a limit, but carries no clue of one
+    ],
+)
+def test_other_403_details_are_forbidden_errors(details: str) -> None:
+    exc = from_response(status=403, request_id=None, errors=_not_allowed(details))
+    assert isinstance(exc, KardinalForbiddenError)
+    assert exc.details == details
 
 
 def test_a_plan_size_limit_is_still_a_limit_error() -> None:
@@ -295,7 +356,14 @@ def test_a_plan_size_limit_is_still_a_limit_error() -> None:
     assert isinstance(exc, KardinalLimitError)
 
 
-def test_the_exact_text_under_another_code_is_still_a_limit_error() -> None:
-    errors = [{"code": "INVALID_VALUE", "message": "x", "properties": {"details": "the token is invalid"}}]
+def test_a_future_403_code_with_no_clue_is_a_forbidden_error_and_becomes_the_code() -> None:
+    exc = from_response(status=403, request_id=None, errors=_error("SOME_FUTURE_CODE"))
+    assert isinstance(exc, KardinalForbiddenError)
+    assert exc.code == "SOME_FUTURE_CODE"
+
+
+def test_the_exact_text_under_another_code_is_not_an_auth_error() -> None:
+    errors = [{"code": "SOME_FUTURE_CODE", "message": "x", "properties": {"details": "the token is invalid"}}]
     exc = from_response(status=403, request_id=None, errors=errors)
-    assert isinstance(exc, KardinalLimitError)
+    assert isinstance(exc, KardinalForbiddenError)
+    assert not isinstance(exc, KardinalAuthError)
