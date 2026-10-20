@@ -358,8 +358,40 @@ def test_get_objectives_returns_plain_list() -> None:
     )
     _, solutions = _apis()
     objectives = solutions.get_objectives(_PLAN_ID)
-    assert objectives[0].name.root == "minimizeCosts"
+    assert objectives[0].name == "minimizeCosts"
     assert objectives.warnings == []
+
+
+# The API names the results of maximizePrecedences with parentheses, which an
+# identifier pattern used to refuse.
+_PRECEDENCE_NAMES = [
+    "maximizePrecedences(valid-precedences)",
+    "maximizePrecedences(valid-precedences-group-proximity)",
+]
+
+
+@respx.mock
+def test_get_objectives_reads_the_maximize_precedences_names() -> None:
+    items = [{"name": name, "priority": 0, "value": 1.0} for name in _PRECEDENCE_NAMES]
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}/solution/objectives").mock(
+        return_value=httpx.Response(200, json={"items": items})
+    )
+    _, solutions = _apis()
+    objectives = solutions.get_objectives(_PLAN_ID)
+    assert [o.name for o in objectives] == _PRECEDENCE_NAMES
+
+
+@respx.mock
+def test_get_reads_the_maximize_precedences_names() -> None:
+    objectives = [{"name": name, "priority": 0, "value": 1.0} for name in _PRECEDENCE_NAMES]
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}/solution").mock(
+        return_value=httpx.Response(
+            200, json={"item": {"planId": _PLAN_ID, "objectives": objectives}}
+        )
+    )
+    _, solutions = _apis()
+    solution = solutions.get(_PLAN_ID)
+    assert [o.name for o in solution.objectives] == _PRECEDENCE_NAMES
 
 
 @respx.mock

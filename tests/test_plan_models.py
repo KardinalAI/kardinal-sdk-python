@@ -94,3 +94,19 @@ def test_a_stop_without_its_type_discriminator_is_rejected() -> None:
     stop = {k: v for k, v in _STOP.items() if k != "type"}
     with pytest.raises(ValidationError):
         Order.model_validate(_order(stops=[stop]))
+
+
+@pytest.mark.parametrize("field", ["height", "width", "length"])
+def test_a_truck_dimension_is_a_whole_number_of_centimetres(field: str) -> None:
+    for accepted in (380, 380.0):
+        truck = models.VehicleProfileTruck.model_validate({"type": "truck", field: accepted})
+        dumped = truck.model_dump(mode="json", exclude_none=True)[field]
+        assert dumped == 380
+        assert isinstance(dumped, int)
+
+    # 2.55 * 100 is 254.99999999999997: a size computed from metres must be
+    # rounded, round(width_m * 100).
+    for refused in (4.2, 2.55 * 100):
+        with pytest.raises(ValidationError) as error:
+            models.VehicleProfileTruck.model_validate({"type": "truck", field: refused})
+        assert error.value.errors()[0]["type"] == "int_from_float"

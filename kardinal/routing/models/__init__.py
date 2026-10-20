@@ -236,7 +236,10 @@ class ObjectivesEnum(Enum):
 
 class StopTagPrecedencePair(BaseModel):
     """
-    A pair of precedence stop tags.
+    A pair of stop tags that the engine tries to visit in this order.
+
+    The pair only counts between stops of the same tour, and it looks at the order of the visits, not at their times. Pairs chain: "A before B" and "B before C" also mean "A before C". A loop of pairs is refused with a 400 error.
+
     """
 
     model_config = ConfigDict(
@@ -244,12 +247,12 @@ class StopTagPrecedencePair(BaseModel):
     )
     previous: RegexIdValidation = Field(
         ...,
-        description='Stop tag that must be visited before any stop tagged `next`.',
+        description='Stop tag that the engine tries to visit before any stop tagged `next` in the same tour.',
         examples=['sector1'],
     )
     next: RegexIdValidation = Field(
         ...,
-        description='Stop tag that the engine tries to visit only after every stop tagged `previous`.',
+        description='Stop tag that the engine tries to visit only after every stop tagged `previous` in the same tour.',
         examples=['sector2'],
     )
 
@@ -266,6 +269,8 @@ class MaximizePrecedencesObjective(BaseModel):
     """
     Objective that rewards the engine for respecting a set of "this stop tag before that stop tag" precedence pairs, as an entry in `PlanObjectives`.
 
+    > **Modelling pitfall.** This is a preference, not a hard rule: the engine can break a pair when time windows or other objectives make it the better choice. When the engine plans the tour itself, the only order it always keeps is the order of the stops inside one order's `stops` array. Ranked before `minimizeResources`, `maximizePrecedences` can make the engine use more vehicles than it needs: for example, four stops that one vehicle could serve can end up split over two vehicles.
+
     """
 
     model_config = ConfigDict(
@@ -280,8 +285,8 @@ class MaximizePrecedencesObjective(BaseModel):
         description='Precedence pairs the engine tries to satisfy as many of as possible.',
     )
     disableGroupProximity: Optional[bool] = Field(
-        None,
-        description='If true, disables the group proximity objective that otherwise runs alongside this one.',
+        False,
+        description='If true, the engine does not add the second objective that it otherwise runs right after `maximizePrecedences`.\n\nThat second objective brings each badly placed stop closer to its first valid position, to keep the stops of one sector together. It therefore ranks before every objective listed after `maximizePrecedences`, including `minimizeCosts` and `minimizeDistance`.\n\n> **When to use.** Set it to `true` when you need the order of the pairs but not the grouping by sector.\n',
     )
 
 
@@ -343,7 +348,7 @@ class DateTime(RootModel[str]):
 class TimeZone(RootModel[str]):
     root: str = Field(
         ...,
-        description='IANA time zone identifier (the "tz database"), used to interpret a local datetime that has no explicit UTC offset.\n\nA datetime can always be given in ISO 8601 with an explicit offset or `Z`, for example these three values for the same instant: `2025-05-22T05:43:00Z`, `2025-05-22T06:43:00+01:00`, `2025-05-22T07:43:00+02:00`. Pairing a local datetime with a `tz` value is a more human-readable alternative input: `2025-05-22 07:43` with `tz: "Europe/Paris"` denotes that same instant, and seconds are optional.\n\nWith `tz`, a local datetime must use a space between date and time. The `T` form without `Z` and without an offset (`2025-05-22T07:43:00`) is rejected. Without `tz`, any local datetime is rejected with HTTP 400, not read as UTC. A `Z` or an offset in a datetime always wins over `tz`. Milliseconds in a `Z` datetime are accepted and dropped. The offset follows the date: for example, `Europe/Paris` gives `+02:00` in summer and `+01:00` in winter.\n\nWhen `tz` is set, the API writes the datetimes of the stored plan and of the solution back in the offset of that zone, even if they were sent as `Z`. Read-only fields such as `createdAt` are always in `Z`. Set `tz` in every plan, even when every datetime carries an offset, so that responses are consistent.\n\nWhere a JSON input object accepts a `tz` property, every local datetime found elsewhere in that same object is converted to ISO 8601 using it before further processing.\n\nSee [Dates and time zones](https://developers.kardinal.ai/reference/data-model#dates-and-time-zones).\n\n> **Modelling pitfall.** A `properties` sub-object (free-form client data, see the `Properties` schema) is never scanned for local datetimes, regardless of `tz`.\n',
+        description='IANA time zone identifier (the "tz database"), used to interpret a local datetime that has no explicit UTC offset.\n\nA datetime can always be given in ISO 8601 with an explicit offset or `Z`, for example these three values for the same instant: `2025-05-22T05:43:00Z`, `2025-05-22T06:43:00+01:00`, `2025-05-22T07:43:00+02:00`. Pairing a local datetime with a `tz` value is a more human-readable alternative input: `2025-05-22 07:43` with `tz: "Europe/Paris"` denotes that same instant, and seconds are optional.\n\nWith `tz`, a local datetime must use a space between date and time. The `T` form without `Z` and without an offset (`2025-05-22T07:43:00`) is rejected. Without `tz`, any local datetime is rejected with HTTP 400, not read as UTC. A `Z` or an offset in a datetime always wins over `tz`. Use one form for every datetime of a plan: a plan that mixes local datetimes with `Z` or offset datetimes returns no error, but a window whose two ends use different forms can shrink without warning. Milliseconds in a `Z` datetime are accepted and dropped. The offset follows the date: for example, `Europe/Paris` gives `+02:00` in summer and `+01:00` in winter.\n\nWhen `tz` is set, the API writes the datetimes of the stored plan and of the solution back in the offset of that zone, even if they were sent as `Z`. Read-only fields such as `createdAt` are always in `Z`. Set `tz` in every plan, even when every datetime carries an offset, so that responses are consistent.\n\nWhere a JSON input object accepts a `tz` property, every local datetime found elsewhere in that same object is converted to ISO 8601 using it before further processing.\n\nSee [Dates and time zones](https://developers.kardinal.ai/reference/data-model#dates-and-time-zones).\n\n> **Modelling pitfall.** A `properties` sub-object (free-form client data, see the `Properties` schema) is never scanned for local datetimes, regardless of `tz`.\n',
         examples=['Europe/Paris'],
     )
 
@@ -449,6 +454,8 @@ class Type5(Enum):
 class TimeWindowBreak(BaseModel):
     """
     A required break of a given duration in a given time window, triggered by a fixed clock time. Acts like a `workingTimeWindow` plus `maxWorkingDuration` pair scoped to the break itself.
+
+    > **Modelling pitfall.** The whole break must fit inside `timeWindow`, so it starts at the latest at the window's end minus `duration`. For example, a 45-minute break in a 12:00 to 14:00 window starts by 13:15.
 
     """
 
@@ -911,7 +918,7 @@ class CostFloorsAndCoeffs(BaseModel):
     )
     costFloor: Optional[float] = Field(
         None,
-        description="Minimum value of the base (distance, duration, or capacity) below which no cost applies, in the base's own unit.",
+        description="Minimum value of the base (distance, duration, capacity, or number of tagged stops) below which no cost applies, in the base's own unit.",
         examples=[10],
     )
     costCoeff: Optional[float] = Field(
@@ -1098,21 +1105,21 @@ class Error(BaseModel):
 
     | `code`                  | HTTP status | Default message | Returned when |
     | ------------------------ | ----------- | ---------------- | ------------- |
-    | `INVALID_INPUT`          | 400 | The payload cannot be parsed. | The request body isn't valid JSON, or doesn't match the expected schema (wrong type, missing required field). |
+    | `INVALID_INPUT`          | 400 | The payload cannot be parsed. | The request body isn't valid JSON, or doesn't match the expected schema (wrong type, missing required field). Also returned for a datetime the API cannot read, such as a `T` with no `Z` and no offset, or a local datetime in a plan without `tz` (see [Dates and time zones](https://developers.kardinal.ai/reference/data-model#dates-and-time-zones)). |
     | `ID_NOT_UNIQUE`          | 400 | The payload contains a collection with an id repeated multiple times. | A collection in the payload (for example `resources`, `orders`) has the same `id` on more than one item. |
     | `KEYS_NOT_UNIQUE`        | 400 | The payload contains a collection with the keys repeated multiple times. | A collection has a repeated business key other than `id` (for example a tag or reference field expected to be unique). |
     | `INVALID_ID_REFERENCE`   | 400 | The id reference contains an id that does not exist. | A field references an `id` that doesn't match anything else in the payload or system (for example a `resourceId` that doesn't exist). |
     | `INVALID_VALUE`          | 400 | The field value is not valid. | A field's value fails a validation rule: format, range, or allowed values. |
-    | `PRECONDITION_FAILED`    | 400 | A precondition failed. | The action requires the target resource to be in a particular state, and it isn't (for example acting on an already-deleted or already-archived object). |
+    | `PRECONDITION_FAILED`    | 400 | A precondition failed. | The action requires the target resource to be in a particular state, and it isn't (for example acting on an already-deleted object). |
     | `NOT_IMPLEMENTED`        | 400 | Not yet implemented. | The requested behaviour is recognized but not available yet. Despite the name, this returns `400`, not `501`; treat it as a client-facing "not supported" rather than a server capability gap. |
-    | `NOT_AUTHENTICATED`      | 401 | The caller is not authenticated. | No access token was sent, or it's missing, malformed, or expired. |
-    | `NOT_ALLOWED`            | 403 | The requested action is not allowed. | An agency limit was reached: an optimization quota, a plan size limit, or insufficient credits. `properties.details` states which one. |
+    | `NOT_AUTHENTICATED`      | 401 | The caller is not authenticated. | No access token was sent, or it's missing, malformed, or expired. A token revoked or regenerated in the Console gets a `403` `NOT_ALLOWED` instead. |
+    | `NOT_ALLOWED`            | 403 | The requested action is not allowed. | Usually an agency limit was reached: an optimization quota, a plan size limit, or insufficient credits. Two other cases return it and are not limits: a token revoked or regenerated in the Console (`properties.details` is `the token is invalid`), and an update, stop or restart of an archived plan without `force`. `properties.details` states which case applies. |
     | `NOT_FOUND`              | 404 | The requested object could not be found. | The resource addressed by the URL doesn't exist, or isn't visible to the caller (the API doesn't distinguish the two, to avoid leaking existence of resources you can't access). |
     | `INTERNAL_SERVER_ERROR`  | 500 | The server encountered an unexpected condition that prevented it from fulfilling the request. | Unexpected server-side failure, unrelated to the request's content. If this persists, contact support with the request's timestamp. |
 
     This enum reflects the codes returned by the current server implementation. New codes may be added in future non-breaking releases; treat an unrecognized `code` value defensively (fall back to the HTTP status and `message`) rather than assuming this list is closed.
 
-    One thing this catalogue does not cover: **infeasible plans are not an error.** Submitting a plan the engine can't fully satisfy still returns a normal `200`/`201`. The plan is accepted, and unplanned stops or constraint violations show up in the solution (`unaffectedStopIds`, `violations`) rather than as an `Error`.
+    One thing this catalogue does not cover: **infeasible plans are not an error.** Submitting a plan the engine can't fully satisfy still returns a normal `200`/`201`. The plan is accepted, and unplanned stops or constraint violations show up in the solution (`unaffectedStopIds`, `tours[].violations` and, when present, `globalViolations`) rather than as an `Error`.
 
     """
 
@@ -1163,9 +1170,9 @@ class SolutionObjective(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    name: Optional[RegexIdValidation] = Field(
+    name: Optional[str] = Field(
         None,
-        description="Objective name, matching an `ObjectivesEnum` value or a `CustomObjective`'s `name`.",
+        description="Objective name, matching an `ObjectivesEnum` value or a `CustomObjective`'s `name`.\n\n`maximizePrecedences` produces `maximizePrecedences(valid-precedences)` and `maximizePrecedences(valid-precedences-group-proximity)`. With `disableGroupProximity` set to `true`, it produces the single name `maximizePrecedences`.\n",
         examples=['minimizeCosts'],
     )
     priority: Optional[int] = Field(
@@ -1225,8 +1232,8 @@ class GlobalViolationMaxCumulatedCost(BaseModel):
     )
     exceededCost: Optional[float] = Field(
         None,
-        description='The cumulated cost by which `maximum` was exceeded.',
-        examples=[150],
+        description='The total cumulated cost counted by the constraint, which is greater than `maximum`. It is not the excess: with `maximum` 100 and a counted total of 140, `exceededCost` is 140, not 40.\n',
+        examples=[1150],
     )
 
 
@@ -2213,14 +2220,14 @@ class EnvelopedPlanReference(BaseModel):
 
 class TimedPlanState(BaseModel):
     """
-    A snapshot of a plan's `PlanState` at a given point in time, one entry in its state history.
+    A plan's `PlanState` for one version of the plan.
     """
 
     model_config = ConfigDict(
         extra='allow',
     )
     planVersion: Optional[PlanVersion] = Field(
-        None, description="The corresponding plan's version.", examples=[2]
+        None, description='The version of the plan this state describes.', examples=[2]
     )
     timestamp: Optional[DateTime] = Field(
         None, description='When this state was recorded.'
@@ -2232,15 +2239,13 @@ class TimedPlanState(BaseModel):
 
 class EnvelopedTimedPlanState(BaseModel):
     """
-    A single plan state-history entry wrapped with its identifying metadata.
+    A plan's latest state, wrapped with its identifying metadata.
     """
 
     model_config = ConfigDict(
         extra='allow',
     )
-    item: Optional[TimedPlanState] = Field(
-        None, description='The state-history entry itself.'
-    )
+    item: Optional[TimedPlanState] = Field(None, description='The state itself.')
     agencyId: Optional[AgencyId] = None
     planId: Optional[PlanId] = None
 
@@ -2332,7 +2337,7 @@ class SingleStop(BaseModel):
     )
     authorizedTimeWindows: Optional[List[TaggedTimeWindow]] = Field(
         None,
-        description='One or more hard time windows for the stop. Outside all of them, the stop cannot be planned at all. Accepts an array, so more than one disjoint hard window is native, for example a site open mornings and again in the evening; the stop is feasible if reachable in any one of them. Modelling an acceptable-if-late window as a hard one fails silently: the stop is simply dropped rather than delivered late.\n\n> **Modelling pitfall.** A contractual delivery window is not automatically a hard one. Ask what should happen if the fleet cannot hit it: if a late visit is acceptable, use `preferredTimeWindows` instead.\n\n> **Modelling pitfall.** `begin`/`end` bound the resource\'s *arrival* at the stop, not when it finishes: the stop can complete up to `operationDuration` after `end`. To express "must be done and gone by 15:00", subtract `operationDuration` from `end` yourself (for a 15-minute operation, set `end` to `"...T14:45:00"`); the API does not do this for you.\n',
+        description='One or more hard time windows for the stop. Outside all of them, the stop cannot be planned at all. Accepts an array, so more than one disjoint hard window is native, for example a site open mornings and again in the evening; the stop is feasible if reachable in any one of them. Modelling an acceptable-if-late window as a hard one fails silently: the stop is simply dropped rather than delivered late.\n\n> **Modelling pitfall.** A contractual delivery window is not automatically a hard one. Ask what should happen if the fleet cannot hit it: if a late visit is acceptable, use `preferredTimeWindows` instead.\n\n> **Modelling pitfall.** `begin`/`end` bound the resource\'s *arrival* at the stop, not when it finishes: the stop can complete up to `operationDuration` after `end`. To express "must be done and gone by 15:00", subtract `operationDuration` from `end` yourself (for a 15-minute operation, set `end` to `"2026-08-03 14:45"`); the API does not do this for you.\n',
         examples=[
             [{'begin': '2026-03-17T08:00:00+01:00', 'end': '2026-03-17T12:00:00+01:00'}]
         ],
@@ -2427,6 +2432,8 @@ class VehicleProfileTruck(BaseModel):
 
     > **Default.** Setting `type: "truck"` and leaving every truck-only field unset does not apply any default legal-truck-road restriction; routing behaves exactly like `car` until one of those fields is actually set. Default to `car` when a vehicle's dimensions are genuinely unknown, and switch to `truck` once real dimensions or road restrictions are available.
 
+    > **Modelling pitfall.** `height`, `width`, and `length` are whole centimetres, not metres: a truck 3.8 m tall is `height: 380`. A value in metres that happens to be a whole number, such as `length: 12`, raises no error and is read as 12 centimetres, so the vehicle's size no longer restricts its route. A decimal such as `4.2` is refused with a `400`. Round after converting from metres, for example `round(width_m * 100)`, because `2.55 * 100` is not exactly `255` in floating-point arithmetic.
+
     """
 
     model_config = ConfigDict(
@@ -2477,20 +2484,20 @@ class VehicleProfileTruck(BaseModel):
     excludedCountries: Optional[CountryCodes] = Field(
         None, description='Countries to route around entirely.'
     )
-    height: Optional[float] = Field(
+    height: Optional[int] = Field(
         None,
-        description='Vehicle height, in metres, used to respect height-restricted roads such as low bridges.',
-        examples=[4.2],
+        description='Vehicle height, as a whole number of centimetres, used to respect height-restricted roads such as low bridges.',
+        examples=[420],
     )
-    width: Optional[float] = Field(
+    width: Optional[int] = Field(
         None,
-        description='Vehicle width, in metres, used to respect width-restricted roads.',
-        examples=[2.5],
+        description='Vehicle width, as a whole number of centimetres, used to respect width-restricted roads.',
+        examples=[250],
     )
-    length: Optional[float] = Field(
+    length: Optional[int] = Field(
         None,
-        description='Vehicle length, in metres, used to respect length-restricted roads.',
-        examples=[12],
+        description='Vehicle length, as a whole number of centimetres, used to respect length-restricted roads.',
+        examples=[1200],
     )
     tunnelCategory: Optional[TunnelCategory] = None
     speedCap: Optional[float] = Field(
@@ -3133,7 +3140,7 @@ class Resource(BaseModel):
     )
     maxWorkingDuration: Optional[Duration] = Field(
         None,
-        description='Maximum working time (travel, service, breaks and waiting combined) inside `workingTimeWindow`, in ISO 8601 duration format.',
+        description='Maximum working time (travel, service, breaks and waiting combined) inside `workingTimeWindow`, in ISO 8601 duration format.\n\n> **Modelling pitfall.** On a resource that works several days, size it for the whole trip, counting the time spent on breaks and on waiting. A cap sized for one working day rules out any tour that works on both sides of the rest. The engine then leaves unplaced the stops that need such a tour, with no error.\n',
         examples=['PT8H'],
     )
     maxDistanceInKm: Optional[float] = Field(
@@ -3153,7 +3160,7 @@ class Resource(BaseModel):
     )
     breaks: Optional[List[Break]] = Field(
         None,
-        description="Breaks to schedule into this resource's tour; see `Break` for the three available kinds.",
+        description="Breaks to schedule into this resource's tour; see `Break` for the three available kinds.\n\n> **Modelling pitfall.** Currently, the engine schedules a break only where the vehicle already stands, at the start of its tour or at a stop, never in the middle of a drive. A single drive longer than the allowed gap between two breaks makes that drive impossible for the vehicle. The engine leaves the stops that need it unplaced, returns no error, and no violation names the break. If every tour of the vehicle needs that drive, the vehicle is not used at all. See [Where a break can fall](https://developers.kardinal.ai/guides/advanced-constraints#where-a-break-can-fall).\n",
     )
     operationDurationPolicies: Optional[List[OperationDurationPolicy]] = Field(
         None,
@@ -3288,7 +3295,7 @@ class GlobalConstraintMaxCumulatedCost(BaseModel):
     )
     maximum: Optional[float] = Field(
         None,
-        description="The constraint's maximum allowed cumulated cost.",
+        description="The constraint's maximum allowed cumulated cost, in the same unit as the costs in `costsByResourceTag`. This is a hard limit: the engine leaves stops unplanned rather than exceed it, so a mandatory stop can end up in `unaffectedStopIds`. The exception is locked tours (`state.mode: fixed`) that already cost more than `maximum`: the engine keeps the locked stops, goes over `maximum`, and reports it in `globalViolations`.\n\n> **Default.** Always set `maximum`. When it is omitted, the API stores 0, with no error and no warning, so the cap allows no counted cost: with a positive `using` cost, the resources that carry the tags in `costsByResourceTag` can't be used.\n",
         examples=[1000],
     )
     costsByResourceTag: CostsByResourceTag
@@ -3492,7 +3499,7 @@ class Solution(BaseModel):
     """
     The engine's best solution found for a plan: which tour each resource runs, which stops could not be placed, and the resulting objective values.
 
-    > **Modelling pitfall.** An infeasible or partially served plan is not an error: the response is still a normal `200`/`201`. Check `unaffectedStopIds` and `tours[].violations` to detect an incomplete solution, rather than relying on the HTTP status.
+    > **Modelling pitfall.** An infeasible or partially served plan is not an error: the response is still a normal `200`/`201`. Check `unaffectedStopIds`, `tours[].violations` and, when present, `globalViolations` to detect a solution that leaves stops out or breaks a constraint, rather than relying on the HTTP status.
 
     """
 
