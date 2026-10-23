@@ -304,6 +304,70 @@ def test_an_order_appended_to_a_fetched_plan_is_sent() -> None:
     assert [o["id"] for o in sent["orders"]] == ["o1", "o2"]
 
 
+_RESOURCE = {
+    "id": "r1",
+    "vehicleProfile": {"type": "car"},
+    "workingTimeWindow": {"begin": "2026-08-03 07:00", "end": "2026-08-03 19:00"},
+}
+_PRECEDENCES = {"type": "maximizePrecedences", "precedences": [{"previous": "a", "next": "b"}]}
+_DEFAULTS = {
+    "plan": {"lateDeparture": False, "sharedCapacities": False},
+    "resource": {"priority": 0},
+    "order": {"priority": 0},
+    "objective": {"disableGroupProximity": False},
+}
+
+
+def _stored_plan(defaults: dict) -> dict:
+    return {
+        "resources": [{**_RESOURCE, **defaults.get("resource", {})}],
+        "orders": [{"id": "o1", "stops": [_STOP], **defaults.get("order", {})}],
+        "objectives": ["maximizeMandatoryStops", {**_PRECEDENCES, **defaults.get("objective", {})}],
+        **defaults.get("plan", {}),
+    }
+
+
+@pytest.mark.parametrize("defaults", [{}, _DEFAULTS], ids=["defaults absent", "defaults stored"])
+@respx.mock
+def test_an_unchanged_plan_is_sent_back_exactly_as_stored(defaults: dict) -> None:
+    # The API compares an update with the stored plan as JSON, where an
+    # absent field and the same field at its default value differ. Sending
+    # `lateDeparture: false` back on a plan stored without it would create
+    # a new version and optimize the plan again, for no change at all.
+    stored = _stored_plan(defaults)
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, **stored}})
+    )
+    route = respx.put(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": []}})
+    )
+    plans = _plans()
+    plans.update(plans.get(_PLAN_ID))
+    assert json.loads(route.calls.last.request.content) == stored
+
+
+@respx.mock
+def test_a_default_set_by_the_caller_is_sent() -> None:
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, **_stored_plan({})}})
+    )
+    route = respx.put(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": []}})
+    )
+    plans = _plans()
+    plan = plans.get(_PLAN_ID)
+    plan.lateDeparture = False
+    plan.resources[0].priority = 2
+    plan.objectives.root[1].disableGroupProximity = True
+    plans.update(plan)
+    sent = json.loads(route.calls.last.request.content)
+    assert sent["lateDeparture"] is False
+    assert sent["resources"][0]["priority"] == 2
+    assert sent["objectives"][1]["disableGroupProximity"] is True
+    assert "sharedCapacities" not in sent
+    assert "priority" not in sent["orders"][0]
+
+
 def test_a_hand_built_order_keeps_an_unknown_field_for_submit_to_report() -> None:
     order = Order(id="o1", stops=[], typo=True)
     assert [f.path for f in unknown_fields(order, "order")] == ["order.typo"]

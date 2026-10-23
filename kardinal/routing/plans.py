@@ -228,6 +228,13 @@ class PlansAPI:
         is a free no-op, returning the same version. Only newly added unique
         stops are billed.
 
+        Only the fields the plan was read or built with, plus the ones set
+        on it since, are sent. A default this SDK fills in, such as
+        `lateDeparture: false` or a `priority` of 0, is left out when the
+        API didn't send it: the API compares the body with the stored plan
+        as JSON, where an absent field and the same field at its default
+        differ, so sending it would create a new version for no change.
+
         `force` unarchives the plan first if it's archived; ignored otherwise.
 
         Unknown keys are sorted by where they came from. One the server
@@ -264,8 +271,12 @@ class PlansAPI:
                     stacklevel=2,
                 )
         # `warnings` is this SDK's own field (see `Plan`), not the plan's.
+        # `exclude_unset`: see the docstring.
         body = plan.model_dump(
-            mode="json", exclude_none=True, exclude=set(_PLAN_READ_ONLY_FIELDS | {"warnings"})
+            mode="json",
+            exclude_unset=True,
+            exclude_none=True,
+            exclude=set(_PLAN_READ_ONLY_FIELDS | {"warnings"}),
         )
         response = self._transport.request(
             "PUT", f"/plans/{plan.id}", json=body, params={"force": force}
