@@ -110,3 +110,17 @@ def test_a_truck_dimension_is_a_whole_number_of_centimetres(field: str) -> None:
         with pytest.raises(ValidationError) as error:
             models.VehicleProfileTruck.model_validate({"type": "truck", field: refused})
         assert error.value.errors()[0]["type"] == "int_from_float"
+
+
+def test_a_max_cumulated_cost_constraint_needs_its_maximum() -> None:
+    # The API refuses a constraint without `maximum` with a 400: it is
+    # refused here instead, before anything is sent.
+    constraint = {"type": "maxCumulatedCost", "costsByResourceTag": {"rented": {"using": 100}}}
+    with pytest.raises(ValidationError) as error:
+        PlanCreate.model_validate({"resources": [_RESOURCE], "globalConstraints": [constraint]})
+    assert [(e["type"], e["loc"][-1]) for e in error.value.errors()] == [("missing", "maximum")]
+
+    plan = PlanCreate.model_validate(
+        {"resources": [_RESOURCE], "globalConstraints": [{**constraint, "maximum": 1000}]}
+    )
+    assert plan.model_dump(mode="json", exclude_none=True)["globalConstraints"][0]["maximum"] == 1000

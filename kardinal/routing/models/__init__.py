@@ -215,7 +215,7 @@ class ObjectivesEnum(Enum):
     - minimizeLargestTourDuration: Minimizes the working duration of the single longest tour across the fleet (travel, service, and waiting time), balancing workload between resources.
     - minimizeWorkingDuration: Minimizes the total working duration summed across every tour, waiting time included.
     - minimizeDistance: Minimizes the total distance travelled summed across every tour.
-    - minimizeEarlyLoadings: Minimizes early loadings; pairs with a resource's `avoidEarlyLoadings` declarations.
+    - minimizeEarlyLoadings: Minimizes early loadings. A loading is early when a vehicle loads an order at a stop with a declared tag, such as a depot, then comes back to a stop with that tag before delivering the order. The declarations go in a resource's `avoidEarlyLoadings` or in `Plan.avoidEarlyLoadingsByResourceTag` (see `AvoidEarlyLoading`). A plan with the objective and no declaration, or the reverse, is refused with a `400`.
 
     """
 
@@ -526,7 +526,14 @@ class WorkingDurationSlidingBreak(BaseModel):
 
 class AvoidEarlyLoading(BaseModel):
     """
-    Declares a stop tag and optional capacities for early loading computation.
+    Declares a stop tag where loading early should be avoided, for the `minimizeEarlyLoadings` objective. A loading is early when a vehicle loads an order at a stop with this tag, such as a depot, then comes back to a stop with the tag before delivering the order. The objective also tracks orders going the other way, such as a return that a vehicle collects elsewhere and brings back to a depot.
+
+    A pass is a visit to a stop with the tag. Consecutive stops with the tag count as one pass. For each tracked order, the objective counts the passes between the moment the order is loaded and the moment it is delivered. The pass where the order is loaded or unloaded at a stop with the tag counts too.
+
+    These declarations and the `minimizeEarlyLoadings` objective go together. A plan with one and not the other is refused with a `400` `INVALID_INPUT`. This includes a plan that omits `objectives`, because the default list doesn't contain `minimizeEarlyLoadings`.
+
+    > **Modelling pitfall.** A declaration can track nothing without raising any error, for example with a `stopTag` that no stop carries, a plan-level key that no resource carries, or `capacities` that no loaded stop carries. The objective is then missing from the solution, or its value is 0.
+
     """
 
     model_config = ConfigDict(
@@ -534,12 +541,12 @@ class AvoidEarlyLoading(BaseModel):
     )
     stopTag: RegexIdValidation = Field(
         ...,
-        description='The stop tag identifying stops where early loading should be avoided.',
+        description="Stop tag of the stops where loading early should be avoided, for example a depot's tag.",
         examples=['depot1'],
     )
     capacities: Optional[List[str]] = Field(
         None,
-        description='Capacities to consider. If empty or omitted, all capacities are considered.',
+        description='Capacities whose loads are tracked. Only orders that load or unload one of these capacities at a stop with `stopTag` count. If the list is empty or omitted, all capacities are tracked.\n',
     )
 
 
@@ -913,7 +920,7 @@ class CostFloorsAndCoeffs(BaseModel):
     )
     constantCost: Optional[float] = Field(
         None,
-        description='Fixed cost added regardless of usage, in currency unit.',
+        description='Fixed cost added once per tour as soon as the base is greater than zero, whatever `costFloor` is, in currency unit. A tour whose base is 0 pays nothing, not even this amount.',
         examples=[50],
     )
     costFloor: Optional[float] = Field(
@@ -929,6 +936,7 @@ class CostFloorsAndCoeffs(BaseModel):
     overcostFloor: Optional[float] = Field(
         None,
         description="Value of the base beyond which `overcostCoeff` applies instead of `costCoeff`, in the base's own unit. The overcost rate is usually higher, and a value of 0 caps the cost.",
+        examples=[100],
     )
     overcostCoeff: Optional[float] = Field(
         None,
@@ -1143,6 +1151,8 @@ class Warning(Error):
     """
     A warning has the same structure as an `Error`, but a different semantic. It is present when an accepted payload was amended — traffic turned off, crow-fly forced, `maxOptimizationDuration` clamped, and so on. The amended field and the applied change are described by `properties.path` and `properties.details`.
 
+    A warning can also flag an accepted value that is probably a mistake, with no amendment: for example, a tag in the `costsByResourceTag` of a `maxCumulatedCost` constraint that no resource carries. `properties.path` then points to that value.
+
     Warnings can also accompany the errors of a rejected payload: they then describe the amendments applied before the rejecting error was found.
 
     > **Modelling pitfall.** Warnings are only returned in the response to the `POST` or `PUT` that produced them. They aren't stored with the plan, so a later `GET` never returns them: read them from that response, since afterwards only the amended value remains visible.
@@ -1183,7 +1193,8 @@ class SolutionObjective(BaseModel):
         None, description="Whether this objective's value was minimized or maximized."
     )
     value: Optional[float] = Field(
-        None, description='Achieved value of the objective for this solution.'
+        None,
+        description="Achieved value of the objective for this solution, in the objective's own unit. The value is not rounded.\n\n- Hours, as a decimal number (`1.25` is 1 h 15 min): `minimizeDelay`, `minimizeWorkingDuration`, `minimizeLargestTourDuration`.\n- Kilometres: `minimizeDistance`.\n- The currency of your `cost` coefficients, with no conversion: `minimizeCosts`.\n- The unit of its own coefficients: a `custom` objective.\n- A count, with no unit: `maximizeMandatoryStops`, `maximizeOptionalStops`, `maximizePreferredStops`, `minimizeResources`, `minimizeOverOverlappingCapacitiesOnStops`, `minimizeEarlyLoadings`.\n",
     )
 
 
@@ -2214,7 +2225,8 @@ class EnvelopedPlanReference(BaseModel):
         None, description="The plan's current version: unchanged by this request."
     )
     warnings: Optional[List[Warning]] = Field(
-        None, description='Amendments applied while processing this request, if any.'
+        None,
+        description='Amendments applied, and probable mistakes found, while processing this request, if any.',
     )
 
 
@@ -2548,12 +2560,12 @@ class Cost(BaseModel):
     )
     costsByStopTag: Optional[Dict[str, CostFloorsAndCoeffs]] = Field(
         None,
-        description='Additional cost floors and coefficients on the stops that carry a given tag, by stop tag. The base is the number of visited stops carrying that tag, and floors apply once to the tour total.',
-        examples=[{'warehouse': {'constantCost': 5}}],
+        description='Additional cost floors and coefficients on the stops that carry a given tag, by stop tag. The base is the number of visited stops carrying that tag, and floors apply once to the tour total.\n\n> **Modelling pitfall.** `constantCost` is paid once per tour that visits at least one stop of the tag, never once per stop. A tour with no stop of the tag pays nothing. An amount per stop goes in `costCoeff`.\n',
+        examples=[{'warehouse': {'costCoeff': 5}}],
     )
     costsByCapacity: Optional[Dict[str, TaggedCostFloorsAndCoeffs]] = Field(
         None,
-        description="Additional cost floors and coefficients on the quantities handled at the tour's stops, by capacity name, further scoped to specific stop tags. Each stop adds the absolute value of its quantity, whatever its `kind` or sign, and floors apply once to the tour total.\n\n> **Modelling pitfall.** The base is the quantity handled, not the vehicle's load: loading at departure doesn't count, and a pickup and a delivery of the same 100 units count 200. It applies to any capacity the stops carry, declared on the resource or not, and a guaranteed minimum comes from `constantCost`, not `costFloor`.\n",
+        description="Additional cost floors and coefficients on the quantities handled at the tour's stops, by capacity name, further scoped to specific stop tags. Each stop adds the absolute value of its quantity, whatever its `kind` or sign, and floors apply once to the tour total.\n\n> **Modelling pitfall.** The base is the quantity handled, not the vehicle's load: loading at departure doesn't count, and a pickup and a delivery of the same 100 units count 200. It applies to any capacity the stops carry, declared on the resource or not, and a tour that handles none of the capacity pays no `constantCost`. A minimum that must also hold on such a tour comes from `using`, because `costFloor` only delays `costCoeff`.\n",
         examples=[{'weight': {'stopTags': ['warehouse'], 'costCoeff': 0.1}}],
     )
     costPerCapacityPerTravelledKm: Optional[Dict[str, CostFloorsAndCoeffs]] = Field(
@@ -2614,7 +2626,7 @@ class EnvelopedErrors(BaseModel):
     )
     warnings: Optional[List[Warning]] = Field(
         None,
-        description='Amendments applied to the payload before the preceding errors were found, if any.',
+        description='Amendments applied, and probable mistakes found, in the payload before the preceding errors were found, if any.',
     )
 
 
@@ -2637,7 +2649,8 @@ class EnvelopedSolutionObjectives(BaseModel):
     planId: Optional[PlanId] = None
     planVersion: Optional[PlanVersion] = None
     warnings: Optional[List[Warning]] = Field(
-        None, description='Amendments applied while processing this request, if any.'
+        None,
+        description='Amendments applied, and probable mistakes found, while processing this request, if any.',
     )
 
 
@@ -3178,7 +3191,7 @@ class Resource(BaseModel):
     )
     avoidEarlyLoadings: Optional[List[AvoidEarlyLoading]] = Field(
         None,
-        description='Early loading declarations for this resource. Each entry identifies a stop tag and optional capacities used to compute the `minimizeEarlyLoadings` objective.',
+        description='Early loading declarations for this resource. Each entry names a stop tag for the `minimizeEarlyLoadings` objective, and optionally the capacities to track. A plan with declarations must also list that objective in `objectives`. Otherwise, the plan is refused with a `400`. See `AvoidEarlyLoading`.',
     )
 
 
@@ -3293,12 +3306,15 @@ class GlobalConstraintMaxCumulatedCost(BaseModel):
         description='Name identifying this constraint, referenced by any resulting `GlobalViolationMaxCumulatedCost`.',
         examples=['fleetCostCap'],
     )
-    maximum: Optional[float] = Field(
-        None,
-        description="The constraint's maximum allowed cumulated cost, in the same unit as the costs in `costsByResourceTag`. This is a hard limit: the engine leaves stops unplanned rather than exceed it, so a mandatory stop can end up in `unaffectedStopIds`. The exception is locked tours (`state.mode: fixed`) that already cost more than `maximum`: the engine keeps the locked stops, goes over `maximum`, and reports it in `globalViolations`.\n\n> **Default.** Always set `maximum`. When it is omitted, the API stores 0, with no error and no warning, so the cap allows no counted cost: with a positive `using` cost, the resources that carry the tags in `costsByResourceTag` can't be used.\n",
+    maximum: float = Field(
+        ...,
+        description="The constraint's maximum allowed cumulated cost, in the same unit as the costs in `costsByResourceTag`. It is required and has no default: a constraint without it is rejected with a `400` `INVALID_VALUE` error. This is a hard limit: the engine leaves stops unplanned rather than exceed it, so a mandatory stop can end up in `unaffectedStopIds`. The exception is locked tours (`state.mode: fixed`) that already cost more than `maximum`: the engine keeps the locked stops, goes over `maximum`, and reports it in `globalViolations`.\n",
         examples=[1000],
     )
-    costsByResourceTag: CostsByResourceTag
+    costsByResourceTag: CostsByResourceTag = Field(
+        ...,
+        description='The cost counted towards `maximum` for each resource that carries the tag, by resource tag.\n\n> **Modelling pitfall.** A tag that no resource of the plan carries, for example one with a typing error, counts nothing. The API accepts the plan, and returns a warning for that tag in the `warnings` of its response.\n',
+    )
 
 
 class PlanObjectives(
@@ -3307,20 +3323,22 @@ class PlanObjectives(
     ]
 ):
     """
-    Ordered list of objectives the engine pursues in strict lexicographic priority: it first searches for the best possible value of the first objective, then, among solutions tied on that value, optimizes the second, and so on down the list. Each entry is either a name from `ObjectivesEnum`, a `maximizePrecedences` object, or a `custom` object.
+    Ordered list of objectives the engine pursues in strict lexicographic priority: it first searches for the best possible value of the first objective, then, among solutions tied on that value, optimizes the second, and so on down the list. A tie means exactly equal values, with no tolerance. Each entry is either a name from `ObjectivesEnum`, a `maximizePrecedences` object, or a `custom` object.
 
     `maximizeMandatoryStops`, `maximizeOptionalStops`, and `minimizeResources` are split into one objective per `priority` value present in the plan, kept at the position of the original objective: stops are maximized from the most important level (lowest number) down, resources are minimized from the least important level (highest number) up.
 
+    The list is used as given. The default list applies only when `objectives` is omitted or empty. Nothing is added to a list you set. Each entry may appear only once. A list with two entries of the same name is refused with a `400` `ID_NOT_UNIQUE` on `plan.objectives`. This rule also covers two `maximizePrecedences` objects, and two `custom` objects that share a `name`.
+
     > **When to use.** Reorder the list to change which objective the engine favours when two cannot both be improved at once, for example moving `minimizeCosts` ahead of `minimizeDistance` when cost matters more than raw kilometres for this fleet.
 
-    > **Modelling pitfall.** Because priority is lexicographic rather than weighted, reordering the list can change the chosen solution even when every objective's value looks comparable; moving an objective earlier makes the engine trade off later objectives to protect it, not merely break ties differently.
+    > **Modelling pitfall.** Because priority is lexicographic rather than weighted, reordering the list can change the chosen solution even when every objective's value looks comparable; moving an objective earlier makes the engine trade off later objectives to protect it, not merely break ties differently. A list without `maximizeMandatoryStops` is accepted, but it may plan no stop at all: with `["minimizeDistance"]` alone, every stop stays unplanned.
 
     """
 
     root: List[Union[ObjectivesEnum, MaximizePrecedencesObjective, CustomObjective]] = (
         Field(
             ...,
-            description="Ordered list of objectives the engine pursues in strict lexicographic priority: it first searches for the best possible value of the first objective, then, among solutions tied on that value, optimizes the second, and so on down the list. Each entry is either a name from `ObjectivesEnum`, a `maximizePrecedences` object, or a `custom` object.\n\n`maximizeMandatoryStops`, `maximizeOptionalStops`, and `minimizeResources` are split into one objective per `priority` value present in the plan, kept at the position of the original objective: stops are maximized from the most important level (lowest number) down, resources are minimized from the least important level (highest number) up.\n\n> **When to use.** Reorder the list to change which objective the engine favours when two cannot both be improved at once, for example moving `minimizeCosts` ahead of `minimizeDistance` when cost matters more than raw kilometres for this fleet.\n\n> **Modelling pitfall.** Because priority is lexicographic rather than weighted, reordering the list can change the chosen solution even when every objective's value looks comparable; moving an objective earlier makes the engine trade off later objectives to protect it, not merely break ties differently.\n",
+            description='Ordered list of objectives the engine pursues in strict lexicographic priority: it first searches for the best possible value of the first objective, then, among solutions tied on that value, optimizes the second, and so on down the list. A tie means exactly equal values, with no tolerance. Each entry is either a name from `ObjectivesEnum`, a `maximizePrecedences` object, or a `custom` object.\n\n`maximizeMandatoryStops`, `maximizeOptionalStops`, and `minimizeResources` are split into one objective per `priority` value present in the plan, kept at the position of the original objective: stops are maximized from the most important level (lowest number) down, resources are minimized from the least important level (highest number) up.\n\nThe list is used as given. The default list applies only when `objectives` is omitted or empty. Nothing is added to a list you set. Each entry may appear only once. A list with two entries of the same name is refused with a `400` `ID_NOT_UNIQUE` on `plan.objectives`. This rule also covers two `maximizePrecedences` objects, and two `custom` objects that share a `name`.\n\n> **When to use.** Reorder the list to change which objective the engine favours when two cannot both be improved at once, for example moving `minimizeCosts` ahead of `minimizeDistance` when cost matters more than raw kilometres for this fleet.\n\n> **Modelling pitfall.** Because priority is lexicographic rather than weighted, reordering the list can change the chosen solution even when every objective\'s value looks comparable; moving an objective earlier makes the engine trade off later objectives to protect it, not merely break ties differently. A list without `maximizeMandatoryStops` is accepted, but it may plan no stop at all: with `["minimizeDistance"]` alone, every stop stays unplanned.\n',
         )
     )
 
@@ -3455,7 +3473,7 @@ class Plan(BaseModel):
     avoidEarlyLoadingsByResourceTag: Optional[Dict[str, List[AvoidEarlyLoading]]] = (
         Field(
             None,
-            description='Early loading declarations grouped by resource tag. The wildcard tag "*" matches all resources. Each entry identifies a stop tag and optional capacities used to compute the `minimizeEarlyLoadings` objective.\n',
+            description='Early loading declarations grouped by resource tag. The wildcard tag "*" matches all resources. Each entry names a stop tag for the `minimizeEarlyLoadings` objective, and optionally the capacities to track. A plan with declarations must also list that objective in `objectives`. Otherwise, the plan is refused with a `400`. See `AvoidEarlyLoading`.\n',
             examples=[
                 {
                     '*': [{'stopTag': 'depot1', 'capacities': ['weight', 'volume']}],
@@ -3491,7 +3509,8 @@ class EnvelopedPlan(BaseModel):
     planId: Optional[PlanId] = None
     planVersion: Optional[PlanVersion] = None
     warnings: Optional[List[Warning]] = Field(
-        None, description='Amendments applied while processing this request, if any.'
+        None,
+        description='Amendments applied, and probable mistakes found, while processing this request, if any.',
     )
 
 
@@ -3617,7 +3636,8 @@ class EnvelopedSolution(BaseModel):
     planId: Optional[PlanId] = None
     planVersion: Optional[PlanVersion] = None
     warnings: Optional[List[Warning]] = Field(
-        None, description='Amendments applied while processing this request, if any.'
+        None,
+        description='Amendments applied, and probable mistakes found, while processing this request, if any.',
     )
 
 
