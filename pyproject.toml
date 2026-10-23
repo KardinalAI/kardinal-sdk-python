@@ -27,6 +27,7 @@ dependencies = [
 
 [project.urls]
 Documentation = "https://developers.kardinal.ai/sdks/overview"
+Changelog = "https://developers.kardinal.ai/sdks/python/changelog"
 Source = "https://github.com/KardinalAI/kardinal-sdk-python"
 Issues = "https://github.com/KardinalAI/kardinal-sdk-python/issues"
 

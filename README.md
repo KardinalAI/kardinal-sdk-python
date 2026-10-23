@@ -18,6 +18,10 @@ or a wrong argument type is reported in your editor, before anything runs.
 Documentation: https://developers.kardinal.ai/sdks/overview (SDK guides and reference)
 and https://developers.kardinal.ai (the API itself).
 
+Changelog: https://developers.kardinal.ai/sdks/python/changelog (what changes in
+each release of this SDK) and https://developers.kardinal.ai/reference/changelog
+(what changes in the API itself).
+
 ## Quickstart
 
 ```python
