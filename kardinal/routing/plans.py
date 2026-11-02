@@ -23,9 +23,10 @@ from ._annotations import _lenient_enums, validate_response
 from . import models
 
 
-# The generated `Order` already takes a `SingleStop` or `AlternativesStop`
-# directly in `stops`, so it is the one used for both requests and
-# responses. Re-exported here, where it has always been imported from.
+# A hand-written `Order` subclass used to exist only to let `stops` take a
+# `SingleStop` or an `AlternativesStop` directly. The generated `Order` now
+# accepts both, so no subclass is needed: this alias keeps `Order` importable
+# from this module.
 Order = models.Order
 
 
@@ -38,7 +39,9 @@ class PlanCreate(BaseModel):
     and returns a 201; `submit()` reports it as `plan.id` rather than let a
     caller believe the id they sent is the plan's.
 
-    `extra="allow"`: see `Order` above.
+    `extra="allow"`, so a misspelled key is kept rather than dropped, and
+    `submit()` reports it as one `UnknownFieldError` listing every level
+    (the plan, its resources, orders, stops, ...) where one was found.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -96,8 +99,8 @@ class Plan(models.Plan):
     - `id` is narrowed to required: every `Plan` this SDK hands back came
       from the server and always has one. Forgetting it on `update()` fails
       at the type-checking stage, not at the server.
-    - `orders` is retyped to `PlanOrder`, a subclass of this module's
-      `Order` (see above), instead of the generated one, so a `Plan` fetched
+    - `orders` is retyped to `PlanOrder`, a subclass of `Order` (the
+      generated one, see above) that keeps unknown keys, so a `Plan` fetched
       with `get()` and a `PlanCreate` built by hand use the same `stops`
       shape — `plan.orders.append(Order(...))` ahead of `update()` works.
     - `warnings` doesn't exist on the generated `Plan` at all: it's a sibling

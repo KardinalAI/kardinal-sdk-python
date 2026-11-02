@@ -124,21 +124,33 @@ checking anything out there; run `git -C <mintlify repo> fetch` first.
   changes on every run, which would make the "no diff" check
   (`tests/test_models_no_diff.py`) fail on every pipeline regardless of
   whether anything actually changed.
-- Two spec-level codegen defects are patched automatically rather than by
-  editing the generated models: a double-`allOf` chain
-  (`Plan.id -> PlanId -> UUID`) that otherwise makes `id`/`planId` fields
-  unparsable (see `kardinal/routing/_annotations.py`), and two single-choice
-  `oneOf` unions that carry a discriminator despite having nothing to
-  discriminate, which otherwise makes the generated module fail to import
-  entirely (see `scripts/generate_models.sh`).
-- The `PlanId` patch above is applied when `kardinal.routing.plans` is
-  imported, which every documented entry point (`Kardinal`, `routing.plans`,
-  `routing.solutions`, `routing.examples`, the CLI) does first. Importing
-  `kardinal.routing.models` on its own, bypassing all of those, will not
-  have the patch applied. Not fixed at the `kardinal.routing` package level
-  instead, since that would reintroduce `--help` loading the full models
-  module (see `kardinal/routing/_annotations.py`'s docstring for the
-  trade-off).
+- Three generator flags shape the models: `--use-subclass-enum` makes
+  enums `str` subclasses (so `state == "optimized"` and `json.dumps` work),
+  `--collapse-root-models` unwraps single-value wrappers so ids, versions
+  and waypoints are plain values with no `.root`, and
+  `--set-default-enum-member` gives an enum field its spec default as a
+  member.
+- Post-processing in `scripts/generate_models.sh`, applied on every
+  regeneration, never by editing the generated file:
+  - an `ast` step inlines the scalar and enum wrappers the generator leaves
+    (a reference with a description, `allOf: [$ref]`) as plain types, or as
+    an `Annotated[...]` alias when the wrapper carries a pattern or other
+    constraint, so the constraint is still checked; it also restores
+    `discriminator='type'` on every union whose members all declare a `type`
+    literal, which the collapse drops;
+  - two single-choice `oneOf` unions carry a discriminator despite having
+    nothing to discriminate, which makes the module fail to import, so it
+    is removed from them;
+  - the trailing `model_rebuild()` calls are sorted, to keep the output
+    byte-identical across Python builds.
+- Enums print as their value (`str(PlanState.optimized)` is `optimized`, on
+  every Python version): `__str__` and `__format__` are patched on each
+  generated enum when `kardinal.routing.models` is imported
+  (`kardinal/routing/_annotations.py`).
+- The patches in `kardinal/routing/_annotations.py` (the `PlanId` one and
+  enum printing, among others) are applied when the models are imported,
+  because the generated module ends by importing it; importing the models on
+  their own is therefore enough, whatever the entry point.
 - The webhook endpoints are marked `x-excluded` in the spec and are not
   implemented by this SDK.
 - Enum values this SDK version doesn't know (a new plan state, warning

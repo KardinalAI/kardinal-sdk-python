@@ -375,7 +375,8 @@ never lands in shell history or the process list. `solutions wait` takes
   to send an `X-Request-Id` response header.
 - **`get_status()` returns a `PlanState`** (a single value), not the
   detailed `PlanStatus` object embedded in `Plan.status`; a state this SDK
-  version doesn't know yet comes back as its raw string.
+  version doesn't know yet still comes back as a `PlanState`, a pseudo-member
+  that equals its raw string.
 - **`get_objectives()` returns a plain `list`** of `SolutionObjective`,
   with a `.warnings` attribute attached.
 - **`start()` / `stop()` return an `EnvelopedPlanReference`** (`agencyId`,

@@ -227,7 +227,8 @@ def plans_status(plan_id: str, json_out: bool = typer.Option(False, "--json", he
             state = client.routing.plans.get_status(plan_id)
     except KardinalError as exc:
         fail(exc)
-    # A state this SDK version doesn't know comes back as a plain string.
+    # A state this SDK version doesn't know still comes back as a PlanState
+    # (a pseudo-member equal to its raw string).
     emit({"state": getattr(state, "value", state)}, force_json=json_out)
 
 
