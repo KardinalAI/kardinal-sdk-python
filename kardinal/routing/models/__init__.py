@@ -71,7 +71,7 @@ class PlanState(Enum):
     - optimized: This state can be triggered by one of the following events: no better solution can be produced, or the optimization period has reached its limit.
     - stopped: The plan's awaiting optimizations were cancelled.
     - deleted: The plan was deleted and awaiting optimizations were cancelled.
-    - interrupted: The plan was either updated, stopped, or deleted during its optimization.
+    - interrupted: The plan was either updated, stopped, restarted, or deleted during its optimization.
 
     """
 
@@ -414,7 +414,11 @@ class Capacities(RootModel[Dict[str, float]]):
 
 class TaggedTimeWindow(BaseModel):
     """
-    `TimeWindow` plus an optional `resourceTags` array, used for `authorizedTimeWindows` / `preferredTimeWindows` on a stop. When `resourceTags` is set, that window only applies to resources carrying a matching tag (for example an early slot reserved for a certified subcontractor); resources without the tag only see the untagged windows.
+    `TimeWindow` plus an optional `resourceTags` array, used for `authorizedTimeWindows` / `preferredTimeWindows` on a stop. When `resourceTags` is set, that window only applies to resources carrying a matching tag (for example an early slot reserved for a certified subcontractor); resources without the tag don't see this window. With several tags, a resource that carries any one of them may use the window.
+
+    The same rule applies on `preferredTimeWindows`. If a stop has only tagged preferred windows and no authorized window, a resource without the tag cannot serve the stop. If the stop also has an authorized window with no tag, that resource serves the stop there, with no delay.
+
+    On a stop, `begin` and `end` bound the start of service, not the arrival. A resource that arrives before `begin` waits until `begin`. For `preferredTimeWindows`, the delay is the time between `end` and the start of service.
 
     """
 
@@ -486,6 +490,8 @@ class TravelDurationSlidingBreak(BaseModel):
     """
     Limitation rule on maximum cumulative driving time without any break. Triggered by cumulative driving time (`maxInterBreakDuration`), requiring a break of at least `minBreakDuration`.
 
+    Currently, the engine can plan a drive longer than `maxInterBreakDuration`. See [Where a break can fall](https://developers.kardinal.ai/guides/breaks#where-a-break-can-fall).
+
     """
 
     model_config = ConfigDict(
@@ -510,6 +516,8 @@ class Type7(Enum):
 class WorkingDurationSlidingBreak(BaseModel):
     """
     Limitation rule on maximum cumulative working time without any break. Triggered by cumulative working time (`maxInterBreakDuration`), requiring a break of at least `minBreakDuration`.
+
+    Currently, the engine can let the cumulative working time go over `maxInterBreakDuration`. See [Where a break can fall](https://developers.kardinal.ai/guides/breaks#where-a-break-can-fall).
 
     """
 
@@ -1042,8 +1050,14 @@ class AssignmentBreak(BaseModel):
         ..., description='Discriminator identifying this waypoint as a break.'
     )
     status: Optional[Status] = None
-    arrivalTime: DateTime = Field(..., description='Time the break starts.')
-    departureTime: DateTime = Field(..., description='Time the break ends.')
+    arrivalTime: DateTime = Field(
+        ...,
+        description='Time the break waypoint starts. It can be earlier than the break itself, for example when the waypoint includes a wait.',
+    )
+    departureTime: DateTime = Field(
+        ...,
+        description='Time the break ends.\n\n> **Modelling pitfall.** `arrivalTime` and `departureTime` show where and when the engine placed the break. They do not show how long the break lasted, and the span can be longer than the break, for example when it includes a wait.\n',
+    )
 
 
 class Type18(Enum):
@@ -1393,7 +1407,7 @@ class AuthorizedTimeWindowViolation(BaseModel):
     )
     forbiddenWindow: TimeWindow = Field(
         ...,
-        description="The `authorizedTimeWindows` entry the stop's actual arrival falls outside of.",
+        description='The `authorizedTimeWindows` entry that the start of service at the stop falls outside of.',
         examples=[
             {'begin': '2026-03-17T08:00:00+01:00', 'end': '2026-03-17T12:00:00+01:00'}
         ],
@@ -1899,6 +1913,8 @@ class AdditionalConstraintForbiddenAssignment(BaseModel):
     """
     `additionalConstraints` scope. Bars a specific resource tag from a specific stop tag: a targeted exclusion, narrower than `incompatibleStopTags`.
 
+    > **Modelling pitfall.** Only resources that carry `resourceTag` are barred: a resource that you add later without the tag can serve the stop. For a rule that must hold when the fleet changes, use `requiredSkills` on the order and `skills` on the resources. See [Skills and assignments](https://developers.kardinal.ai/guides/skills-and-assignments#barring-one-resource-from-a-stop).
+
     """
 
     model_config = ConfigDict(
@@ -2349,14 +2365,14 @@ class SingleStop(BaseModel):
     )
     authorizedTimeWindows: Optional[List[TaggedTimeWindow]] = Field(
         None,
-        description='One or more hard time windows for the stop. Outside all of them, the stop cannot be planned at all. Accepts an array, so more than one disjoint hard window is native, for example a site open mornings and again in the evening; the stop is feasible if reachable in any one of them. Modelling an acceptable-if-late window as a hard one fails silently: the stop is simply dropped rather than delivered late.\n\n> **Modelling pitfall.** A contractual delivery window is not automatically a hard one. Ask what should happen if the fleet cannot hit it: if a late visit is acceptable, use `preferredTimeWindows` instead.\n\n> **Modelling pitfall.** `begin`/`end` bound the resource\'s *arrival* at the stop, not when it finishes: the stop can complete up to `operationDuration` after `end`. To express "must be done and gone by 15:00", subtract `operationDuration` from `end` yourself (for a 15-minute operation, set `end` to `"2026-08-03 14:45"`); the API does not do this for you.\n',
+        description='One or more hard time windows for the stop. Outside all of them, the stop cannot be planned at all. Accepts an array, so more than one disjoint hard window is native, for example a site open mornings and again in the evening; the stop is feasible if reachable in any one of them. Modelling an acceptable-if-late window as a hard one fails silently: the stop is simply dropped rather than delivered late.\n\n`begin` and `end` bound the start of service, which is the stop\'s `beginTime` in the solution. They don\'t bound the arrival. A resource that arrives before `begin` waits until `begin`. That wait counts in the tour\'s `waitingDuration`, not as a delay.\n\n> **Modelling pitfall.** A contractual delivery window is not automatically a hard one. Ask what should happen if the fleet cannot hit it: if a late visit is acceptable, use `preferredTimeWindows` instead.\n\n> **Modelling pitfall.** The stop can finish up to `operationDuration` after `end`. To express "must be done and gone by 15:00", subtract `operationDuration` from `end` yourself: for a 15-minute operation, set `end` to `"2026-08-03 14:45"`.\n',
         examples=[
             [{'begin': '2026-03-17T08:00:00+01:00', 'end': '2026-03-17T12:00:00+01:00'}]
         ],
     )
     preferredTimeWindows: Optional[List[TaggedTimeWindow]] = Field(
         None,
-        description='One or more soft time windows for the stop, reachable outside them at the cost of the `minimizeDelay` objective rather than being dropped.\n',
+        description='One or more soft time windows for the stop. A window is soft at its end only: a late start is allowed, and it costs the `minimizeDelay` objective. The delay is the start of service minus the window\'s `end`.\n\nA preferred window is hard at its start. Service never starts before `begin`, and a resource that arrives early waits. A stop whose preferred windows all open after every resource stops working is therefore not planned.\n\nWhen a preferred window closes before the authorized window opens, the stop is served inside the authorized window. The delay is still measured from the `end` of the preferred window. When a preferred window opens after the authorized window closes, the stop is not planned. When a preferred window sits inside a wider authorized window, service waits for the preferred window to open.\n\n> **Modelling pitfall.** A preferred window doesn\'t make the stop reachable at any time. To express "deliver at 21:00 if possible, otherwise earlier", don\'t use a preferred window: it forbids starting before 21:00.\n',
         examples=[
             [{'begin': '2026-03-17T09:00:00+01:00', 'end': '2026-03-17T11:00:00+01:00'}]
         ],
@@ -2366,6 +2382,9 @@ class SingleStop(BaseModel):
 class AlternativesStop(BaseModel):
     """
     A stop composed of different alternative single stops.
+
+    All alternatives of a group must have the same `kind`. A candidate without `kind` counts as a `delivery`. A group that mixes kinds is refused with a `400`.
+
     """
 
     model_config = ConfigDict(
@@ -2427,7 +2446,7 @@ class Break(
         TimeWindowBreak, TravelDurationSlidingBreak, WorkingDurationSlidingBreak
     ] = Field(
         ...,
-        description="A resource's `breaks` array mixes any of the three types below; they are not mutually exclusive, and a break counts as working time unless its type says otherwise.\n\n> **Modelling pitfall.** The two sliding types (`workingDurationSlidingBreak`, `travelDurationSlidingBreak`) count the same physical break toward both their clocks. Define both together for a shift with a labor-time rule and a driving-time rule, rather than assuming one covers the other.\n\n> **Default.** For a resource whose `workingTimeWindow` spans more than one calendar day, `breaks` is where daily rest has to be encoded; a wide window does not produce it on its own.\n",
+        description="A resource's `breaks` array mixes any of the three types below; they are not mutually exclusive, and a break counts as working time unless its type says otherwise.\n\nA `timeWindowBreak` is hard: the engine drops stops rather than skip the break. Currently, a tour that ends before the window opens has no break waypoint. A tour that keeps running past the end of the window gets a break waypoint. A tour that ends inside the window gets none when enough of the window remains after the tour ends, and the engine drops stops when too little remains. It isn't confirmed whether a wait at a stop counts as the break. A sliding break is not scheduled when the tour is shorter than `maxInterBreakDuration`.\n\n> **Modelling pitfall.** The two sliding types (`workingDurationSlidingBreak`, `travelDurationSlidingBreak`) count the same physical break toward both their clocks. Define both together for a shift with a labor-time rule and a driving-time rule, rather than assuming one covers the other.\n\n> **Default.** For a resource whose `workingTimeWindow` spans more than one calendar day, `breaks` is where daily rest has to be encoded; a wide window does not produce it on its own.\n",
         discriminator='type',
     )
 
@@ -2815,7 +2834,10 @@ class WayPointBreak(BaseModel):
         ..., description='Discriminator identifying this waypoint as a break.'
     )
     status: Optional[Status4] = Field(None, examples=['optimized'])
-    arrivalTime: Optional[DateTime] = Field(None, description='Time the break starts.')
+    arrivalTime: Optional[DateTime] = Field(
+        None,
+        description='Time the break waypoint starts. It can be earlier than the break itself, for example when the waypoint includes a wait.',
+    )
     departureTime: Optional[DateTime] = Field(None, description='Time the break ends.')
     violations: Optional[List[WaypointViolation]] = Field(
         None, description='Constraint violations found at this waypoint.'
@@ -3158,13 +3180,13 @@ class Resource(BaseModel):
     )
     maxDistanceInKm: Optional[float] = Field(
         None,
-        description='Maximum total distance the resource may travel over the plan, in kilometres. Constrains its service area.',
+        description='Maximum total distance the resource may travel over the plan, in kilometres. The distance is measured along the route the resource drives. In production, the route follows the roads.',
         examples=[200],
     )
     maxInterStopDistanceInKm: Optional[Union[float, MaxInterStopDistanceInKmBounds]] = (
         Field(
             None,
-            description='Maximum distance between two consecutive stops on a tour, in kilometres. Either a scalar value applied uniformly to every travel of the tour, or a structured object with independent bounds per segment (`firstTravel`, `interStop`, `lastTravel`).\n\n> **Default.** Each key of the structured form is independent; an absent key means no constraint on that segment, not a constraint set to zero.\n',
+            description='Maximum distance between two consecutive stops on a tour, in kilometres, measured along the route. Either a scalar value applied uniformly to every travel of the tour, or a structured object with independent bounds per segment (`firstTravel`, `interStop`, `lastTravel`).\n\n> **Default.** Each key of the structured form is independent; an absent key means no constraint on that segment, not a constraint set to zero.\n',
         )
     )
     maxInterStopDuration: Optional[Union[Duration, MaxInterStopDurationBounds]] = Field(
@@ -3173,7 +3195,7 @@ class Resource(BaseModel):
     )
     breaks: Optional[List[Break]] = Field(
         None,
-        description="Breaks to schedule into this resource's tour; see `Break` for the three available kinds.\n\n> **Modelling pitfall.** Currently, the engine schedules a break only where the vehicle already stands, at the start of its tour or at a stop, never in the middle of a drive. A single drive longer than the allowed gap between two breaks makes that drive impossible for the vehicle. The engine leaves the stops that need it unplaced, returns no error, and no violation names the break. If every tour of the vehicle needs that drive, the vehicle is not used at all. See [Where a break can fall](https://developers.kardinal.ai/guides/advanced-constraints#where-a-break-can-fall).\n",
+        description="Breaks to schedule into this resource's tour; see `Break` for the three available kinds.\n\n> **Modelling pitfall.** Currently, the engine schedules a break only where the vehicle already stands, never in the middle of a drive. A `timeWindowBreak` can fall at the start of the tour. For a `timeWindowBreak`, a drive that covers the whole time the break could take place is impossible. The engine then leaves the stops that need that drive unplaced. It returns no error and no violation. A sliding break falls only after a stop, never at the start of the tour. For a `travelDurationSlidingBreak` or a `workingDurationSlidingBreak`, the engine allows a drive longer than `maxInterBreakDuration`. When the limit is already passed on arrival at a stop, it adds the missed breaks at that stop, if the tour goes on after it. Nothing catches up the last drive. The engine marks the tour valid and reports no violation. To keep a long drive within the rule, give the route a stop where the break can fall, then check the gaps in the solution. See [Where a break can fall](https://developers.kardinal.ai/guides/breaks#where-a-break-can-fall).\n",
     )
     operationDurationPolicies: Optional[List[OperationDurationPolicy]] = Field(
         None,
@@ -3240,7 +3262,7 @@ class Order(BaseModel):
     )
     maxStopSpan: Optional[Duration] = Field(
         None,
-        description="Maximum time allowed to elapse between the order's stops (for example between a pickup and its delivery), without forcing them to be consecutive.\n",
+        description="Maximum time allowed to elapse between the order's stops (for example between a pickup and its delivery), without forcing them to be consecutive.\n\nThe span runs from the end of service at the order's first stop to the start of service at its last stop. Waiting time counts.\n",
     )
 
 
@@ -3533,7 +3555,7 @@ class Solution(BaseModel):
     )
     unaffectedStopIds: Optional[List[RegexIdValidation]] = Field(
         None,
-        description='Ids of standalone stops that could not be placed on any tour in this solution.',
+        description="Ids of standalone stops that could not be placed on any tour in this solution.\n\nFor an alternatives group that couldn't be placed, one candidate's id appears here and the others appear in `unaffectedAlternativeIds`.\n",
         examples=[['stop2']],
     )
     unaffectedAlternativeIds: Optional[List[RegexIdValidation]] = Field(
@@ -3691,7 +3713,7 @@ class Tour(BaseModel):
     )
     workingDuration: Optional[Duration] = Field(
         None,
-        description='Total time spent actively working (serving stops and breaks) over the whole tour.',
+        description='Whole time of the tour, from its departure to its end. It counts the drives, including the drives to and from the depot, the work at the stops, the breaks, and the waiting. The engine compares this value with the `maxWorkingDuration` of the resource.',
     )
     waitingDuration: Optional[Duration] = Field(
         None,
@@ -3713,7 +3735,7 @@ class Tour(BaseModel):
     )
     isValid: Optional[bool] = Field(
         None,
-        description='Whether the tour satisfies every hard constraint on the resource.\n\n> **Modelling pitfall.** Reflects only hard-constraint satisfaction. A tour can have `isValid: true` while still carrying soft-constraint violations, such as missed preferred time windows reflected in `totalDelay`; check `violations` for the full picture rather than `isValid` alone.\n',
+        description="Whether the tour satisfies every hard constraint on the resource.\n\n> **Modelling pitfall.** Reflects only hard-constraint satisfaction. A tour can have `isValid: true` while still carrying soft-constraint violations, such as missed preferred time windows reflected in `totalDelay` and in the `delay` of each stop. These misses don't appear in `violations`, so read those two fields to see them.\n",
     )
     violations: Optional[List[TourViolation]] = Field(
         None, description='Constraint violations found on this tour.'
