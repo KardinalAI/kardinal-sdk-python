@@ -113,6 +113,10 @@ python scripts/sync_doc_examples.py           # rewrite tests/doc_examples/
 python scripts/sync_doc_examples.py --check   # exit 1 if the copy differs
 ```
 
+When a release changes doc examples that are merged only after PyPI
+publishes, run the check with `MINTLIFY_REF=<docs branch>`, and resync the
+copy at `origin/main` once that branch has merged.
+
 Like the spec check, it reads the pages with `git show` from `../mintlify`
 (or `MINTLIFY_REPO_PATH`) at `origin/main` (or `MINTLIFY_REF`), without
 checking anything out there; run `git -C <mintlify repo> fetch` first.
