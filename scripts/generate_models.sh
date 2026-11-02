@@ -142,10 +142,6 @@ for name, cls in classes.items():
 src = apply(src, edits)
 for name in (*inline, *aliases):
     src = re.sub(rf"^{name}\.model_rebuild\(\)\n", "", src, flags=re.M)
-if "Annotated[" in src:
-    src = src.replace(
-        "from typing import Dict,", "from typing import Annotated, Dict,", 1
-    )
 
 # 2. discriminated unions
 lines = src.splitlines(keepends=True)

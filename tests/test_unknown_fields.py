@@ -26,10 +26,10 @@ def test_a_misspelled_field_on_a_resource_is_reported() -> None:
 
 
 def test_a_misspelled_field_nested_under_a_union_is_reported() -> None:
-    # `stops` and `breaks` hold their items in a RootModel union. A model
-    # compiles its members' validators into itself, so this only works if
-    # every dependant was rebuilt after the members — the case most likely
-    # to regress silently.
+    # `stops` and `breaks` hold their items in a discriminated union of
+    # models. A model compiles its members' validators into itself, so this
+    # only works if every dependant was rebuilt after the members — the case
+    # most likely to regress silently.
     plan = PlanCreate.model_validate(
         {
             "resources": [
@@ -198,3 +198,33 @@ def test_submit_allow_unknown_sends_the_named_field_and_checks_the_rest() -> Non
     with pytest.raises(UnknownFieldError) as excinfo:
         PlansAPI(server).submit(plan, allow_unknown=["aFieldThisSdkDoesNotKnow"])
     assert excinfo.value.paths == ["plan.resources[0].maxWorkingDurationn"]
+
+
+# WHY: fields that legitimately differ. A request never needs the generated
+# `Optional[bool]` for these two flags: `False` is their default, so
+# `PlanCreate` types them `bool`. `maxOptimizationDuration` has the same
+# pattern on both sides, carried by the `Duration` alias here and by the
+# field's own constraint on `models.Plan`.
+_DIFFER_ON_PURPOSE = {"lateDeparture", "sharedCapacities", "maxOptimizationDuration"}
+
+
+def test_plancreate_fields_have_the_same_types_as_the_generated_plan() -> None:
+    # `PlanCreate` re-declares the generated `Plan` minus its read-only
+    # fields. If a spec change alters a type on one side only, a plan built
+    # by hand would silently stop matching what `get()` returns.
+    # `repr`, since the `FieldInfo` inside an `Annotated` compares by identity.
+    shared = (set(PlanCreate.model_fields) & set(models.Plan.model_fields)) - _DIFFER_ON_PURPOSE
+    differing = sorted(
+        name
+        for name in shared
+        if repr(PlanCreate.model_fields[name].annotation) != repr(models.Plan.model_fields[name].annotation)
+    )
+    assert not differing, f"PlanCreate and models.Plan disagree on: {differing}"
+
+
+def test_max_optimization_duration_has_the_same_pattern_on_both_sides() -> None:
+    patterns = [
+        getattr(m, "pattern", None)
+        for m in models.Plan.model_fields["maxOptimizationDuration"].metadata
+    ]
+    assert patterns and all(repr(p)[1:-1] in repr(PlanCreate.model_fields["maxOptimizationDuration"].annotation) for p in patterns)
