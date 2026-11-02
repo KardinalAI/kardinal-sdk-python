@@ -39,13 +39,17 @@ CI runs `pytest -q` and `mypy` on every supported Python version (3.10 to
 Releases are published to PyPI by `.github/workflows/publish.yml`, on the
 GitHub mirror, with Trusted Publishing: no API token is stored anywhere.
 
-1. Open a merge request that sets the new `version` in `pyproject.toml`,
+1. Run `python scripts/sync_doc_examples.py --check` and
+   `bash scripts/check_spec_matches_mintlify.sh` (see "The doc examples" and
+   "The spec"): the copy of the docs examples and the spec must match the
+   docs repository.
+2. Open a merge request that sets the new `version` in `pyproject.toml`,
    and merge it.
-2. Create the tag `vX.Y.Z` (matching that version) on the source
+3. Create the tag `vX.Y.Z` (matching that version) on the source
    repository, on the merged commit. The push mirror copies it to GitHub
    within minutes. Don't create tags on GitHub: the mirror would overwrite
    them.
-3. On GitHub, the workflow tests, checks that the tag matches the package
+4. On GitHub, the workflow tests, checks that the tag matches the package
    version, builds the sdist and the wheel, then waits in the `pypi`
    environment for a reviewer's approval (Actions tab). Once approved, it
    publishes to https://pypi.org/project/kardinal-ai/.
@@ -95,6 +99,24 @@ regeneration. Notes on generated models that pydantic specifically needs
 (not the API itself) live in `kardinal/routing/_annotations.py`, reapplied
 after every regeneration.
 
+### The doc examples
+
+The ```python blocks of the docs pages (`sdks/**/*.mdx` and `guides/*.mdx`
+of the docs repository) are copied into `tests/doc_examples/`, and
+`tests/test_doc_examples.py` runs them against a mocked API, so a docs
+example that the SDK no longer supports fails the suite. The docs
+repository isn't readable from CI, hence the copy. Refresh it after a docs
+change, and check it hasn't drifted before a release:
+
+```bash
+python scripts/sync_doc_examples.py           # rewrite tests/doc_examples/
+python scripts/sync_doc_examples.py --check   # exit 1 if the copy differs
+```
+
+Like the spec check, it reads the pages with `git show` from `../mintlify`
+(or `MINTLIFY_REPO_PATH`) at `origin/main` (or `MINTLIFY_REF`), without
+checking anything out there; run `git -C <mintlify repo> fetch` first.
+
 ### Code generation notes
 
 - `scripts/generate_models.sh` passes `--disable-timestamp`:
@@ -139,6 +161,10 @@ each stack:
 - Validation messages (`plans validate`): the wording of pattern, missing
   field and unknown field errors is shared; other messages come from
   pydantic here and from Zod there.
+- Version numbers: the two SDKs no longer share a version number from
+  2.0.0. Python 2.0.0 removed `.root` (ids, versions, states and waypoints
+  are plain values), a break the TypeScript SDK never had; each SDK
+  follows its own numbering.
 - Pre-releases: TestPyPI here, the npm `next` dist-tag there.
 
 ### What we don't want
