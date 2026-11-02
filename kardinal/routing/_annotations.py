@@ -281,7 +281,10 @@ def _lenient_missing(cls: Type[Enum], value: object) -> Optional[Enum]:
     string), instead of failing the whole response."""
     if not (_LENIENT_ENUMS.get() and isinstance(value, str)):
         return None
-    member = object.__new__(cls)
+    # The generated enums subclass `str`, so the pseudo-member must be a
+    # real `str` carrying the value: that is what makes it compare, hash
+    # and serialise like the known members.
+    member = str.__new__(cls, value)  # type: ignore[type-var]
     member._value_ = value
     member._name_ = value
     return member
@@ -306,6 +309,33 @@ def _patch_lenient_enums() -> bool:
 
 
 LENIENT_ENUMS_PATCH_APPLIED = _patch_lenient_enums()
+
+
+def _enum_str(self: Any) -> str:
+    return str(self.value)
+
+
+def _enum_format(self: Any, format_spec: str) -> str:
+    return format(self.value, format_spec)
+
+
+def _patch_enums_print_as_their_value() -> bool:
+    """The generated enums subclass `str`, so `==`, hashing and `json.dumps`
+    already behave like the value. `str()` and f-strings do not, from Python
+    3.11 on: they print `PlanState.optimized`. Make them print `optimized`
+    on every supported Python version.
+    """
+    patched_any = False
+    for name in dir(models):
+        cls = getattr(models, name)
+        if isinstance(cls, type) and issubclass(cls, Enum) and cls is not Enum:
+            setattr(cls, "__str__", _enum_str)
+            setattr(cls, "__format__", _enum_format)
+            patched_any = True
+    return patched_any
+
+
+ENUM_STR_PATCH_APPLIED = _patch_enums_print_as_their_value()
 
 _M = TypeVar("_M", bound=BaseModel)
 

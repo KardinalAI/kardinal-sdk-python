@@ -59,7 +59,7 @@ class PlanVersion(RootModel[int]):
     root: int = Field(..., description='The plan version.', examples=[42], ge=1)
 
 
-class PlanState(Enum):
+class PlanState(str, Enum):
     """
     The corresponding plan's state.
 
@@ -145,7 +145,7 @@ class MaxInterStopDistanceInKmBounds(BaseModel):
     )
 
 
-class ResourceMode(Enum):
+class ResourceMode(str, Enum):
     """
     Whether the engine may add stops to this resource's tour beyond its `state.assignments` (`free`), or must limit the tour to those assigned entries (`fixed`). How each entry is treated within the tour is set separately, by its `status` (see `AssignmentStatus`).
 
@@ -159,7 +159,7 @@ class ResourceMode(Enum):
     fixed = 'fixed'
 
 
-class StopKind(Enum):
+class StopKind(str, Enum):
     """
     Generic operation label from the resource's own point of view. It sets how the stop's `capacities` affect the resource's load: added for `pickup`, deducted for `delivery`, ignored for `acknowledgement` (an intervention with no cargo exchange).
 
@@ -172,7 +172,7 @@ class StopKind(Enum):
     acknowledgement = 'acknowledgement'
 
 
-class Type(Enum):
+class Type(str, Enum):
     """
     Always set this explicitly (`"type": "single"`), even though it defaults and a bare stop object is accepted as-is: a discriminated-union validator re-parsing your own payload (for example a typed SDK confirming it round-trips) needs the tag present in the data itself to pick the right variant, and rejects an object missing it even when the field has a documented default.
 
@@ -185,7 +185,7 @@ class Kind(RootModel[StopKind]):
     root: StopKind
 
 
-class Type1(Enum):
+class Type1(str, Enum):
     """
     Discriminator identifying this stop as an `alternatives` group.
     """
@@ -193,7 +193,7 @@ class Type1(Enum):
     alternatives = 'alternatives'
 
 
-class Type2(Enum):
+class Type2(str, Enum):
     """
     Discriminator identifying this constraint as `maxCumulatedCost`.
     """
@@ -201,7 +201,7 @@ class Type2(Enum):
     maxCumulatedCost = 'maxCumulatedCost'
 
 
-class ObjectivesEnum(Enum):
+class ObjectivesEnum(str, Enum):
     """
     Name of a built-in objective, used as an entry in `PlanObjectives`.
 
@@ -257,7 +257,7 @@ class StopTagPrecedencePair(BaseModel):
     )
 
 
-class Type3(Enum):
+class Type3(str, Enum):
     """
     Discriminator identifying this objective as `maximizePrecedences`.
     """
@@ -311,7 +311,7 @@ class CostsByCurrency(RootModel[Dict[str, CostRange]]):
     root: Dict[str, CostRange]
 
 
-class Type4(Enum):
+class Type4(str, Enum):
     """
     Discriminator identifying this objective as `custom`.
     """
@@ -319,7 +319,7 @@ class Type4(Enum):
     custom = 'custom'
 
 
-class OptimizationDirection(Enum):
+class OptimizationDirection(str, Enum):
     """
     Whether a `CustomObjective`'s cost should be driven down (`minimize`) or up (`maximize`).
     """
@@ -390,7 +390,7 @@ class FromPrevious(BaseModel):
     )
 
 
-class AtFirstPositionArrival(Enum):
+class AtFirstPositionArrival(str, Enum):
     """
     The resource must go back to wherever its tour actually started, rather than to a separate fixed point. Only valid as a `Resource.arrival` value, not `departure`.
 
@@ -447,7 +447,7 @@ class TimeWindow(BaseModel):
     end: DateTime = Field(..., description='End of the window.')
 
 
-class Type5(Enum):
+class Type5(str, Enum):
     """
     Discriminator identifying this break as `timeWindowBreak`.
     """
@@ -478,7 +478,7 @@ class TimeWindowBreak(BaseModel):
     )
 
 
-class Type6(Enum):
+class Type6(str, Enum):
     """
     Discriminator identifying this break as `travelDurationSlidingBreak`.
     """
@@ -505,7 +505,7 @@ class TravelDurationSlidingBreak(BaseModel):
     maxInterBreakDuration: Duration
 
 
-class Type7(Enum):
+class Type7(str, Enum):
     """
     Discriminator identifying this break as `workingDurationSlidingBreak`.
     """
@@ -558,7 +558,7 @@ class AvoidEarlyLoading(BaseModel):
     )
 
 
-class Policy(Enum):
+class Policy(str, Enum):
     """
     Which operation duration to leave out of the schedule: `withoutFirstOperationDuration` ignores only the first matching stop's operation duration, `withoutOperationDurations` ignores it on every matching stop.
 
@@ -607,7 +607,7 @@ class CountryCodes(RootModel[List[CountryCode]]):
     )
 
 
-class Type8(Enum):
+class Type8(str, Enum):
     """
     Discriminator identifying this vehicle profile as `fly`.
     """
@@ -636,7 +636,7 @@ class VehicleProfileFly(BaseModel):
     )
 
 
-class Type9(Enum):
+class Type9(str, Enum):
     """
     Discriminator identifying this vehicle profile as `pedestrian`.
     """
@@ -670,7 +670,7 @@ class VehicleProfilePedestrian(BaseModel):
     )
 
 
-class Type10(Enum):
+class Type10(str, Enum):
     """
     Discriminator identifying this vehicle profile as `bicycle`.
     """
@@ -706,7 +706,7 @@ class VehicleProfileBicycle(BaseModel):
     )
 
 
-class Type11(Enum):
+class Type11(str, Enum):
     """
     Discriminator identifying this vehicle profile as `scooter`.
     """
@@ -750,7 +750,7 @@ class VehicleProfileScooter(BaseModel):
     )
 
 
-class Type12(Enum):
+class Type12(str, Enum):
     """
     Discriminator identifying this vehicle profile as `motorbike`.
     """
@@ -799,7 +799,7 @@ class VehicleProfileMotorbike(BaseModel):
     )
 
 
-class Type13(Enum):
+class Type13(str, Enum):
     """
     Discriminator identifying this vehicle profile as `car`.
     """
@@ -857,7 +857,7 @@ class VehicleProfileCar(BaseModel):
     )
 
 
-class Type14(Enum):
+class Type14(str, Enum):
     """
     Discriminator identifying this vehicle profile as `truck`.
     """
@@ -865,7 +865,7 @@ class Type14(Enum):
     truck = 'truck'
 
 
-class ShippedHazardousGood(Enum):
+class ShippedHazardousGood(str, Enum):
     """
     ADR hazard class of a good carried by the vehicle, used to respect roads restricted to that class of hazardous goods.
 
@@ -896,7 +896,7 @@ class ShippedHazardousGood(Enum):
     other = 'other'
 
 
-class TunnelCategory(Enum):
+class TunnelCategory(str, Enum):
     """
     ADR tunnel restriction category to route around, from `B` (least restrictive) to `E` (most restrictive).
 
@@ -957,7 +957,7 @@ class Mode(RootModel[ResourceMode]):
     root: ResourceMode
 
 
-class AssignmentStatus(Enum):
+class AssignmentStatus(str, Enum):
     """
     How an entry in `state.assignments` is treated: taken as given, with its position in the sequence and its pinned times left unchallenged (`fixed`), or only assigned to this resource, with the engine sequencing it according to the plan's objectives (`assigned`).
 
@@ -967,7 +967,7 @@ class AssignmentStatus(Enum):
     assigned = 'assigned'
 
 
-class Type15(Enum):
+class Type15(str, Enum):
     """
     Discriminator identifying this waypoint as a stop.
     """
@@ -1007,7 +1007,7 @@ class AssignmentStop(BaseModel):
     )
 
 
-class Type16(Enum):
+class Type16(str, Enum):
     """
     Discriminator identifying this waypoint as the tour's begin.
     """
@@ -1030,7 +1030,7 @@ class AssignmentBegin(BaseModel):
     departureTime: DateTime = Field(..., description='Time the resource departs.')
 
 
-class Type17(Enum):
+class Type17(str, Enum):
     """
     Discriminator identifying this waypoint as a break.
     """
@@ -1060,7 +1060,7 @@ class AssignmentBreak(BaseModel):
     )
 
 
-class Type18(Enum):
+class Type18(str, Enum):
     """
     Discriminator identifying this waypoint as the tour's end.
     """
@@ -1096,7 +1096,7 @@ class ErrorProperties(RootModel[Dict[str, str]]):
     root: Dict[str, str]
 
 
-class Code(Enum):
+class Code(str, Enum):
     """
     Stable identifier for the error type. Branch your error handling on this field, not on the HTTP status alone or on this response's `description` in this spec. Several `code` values can share the same status. See the preceding table.
 
@@ -1220,7 +1220,7 @@ class Mode1(RootModel[ResourceMode]):
     root: ResourceMode
 
 
-class Type19(Enum):
+class Type19(str, Enum):
     """
     Discriminator identifying this violation as `maxCumulatedCost`.
     """
@@ -1262,7 +1262,7 @@ class GlobalViolationMaxCumulatedCost(BaseModel):
     )
 
 
-class Type20(Enum):
+class Type20(str, Enum):
     """
     The violation's type.
     """
@@ -1286,7 +1286,7 @@ class BeginViolation(BaseModel):
     )
 
 
-class Type21(Enum):
+class Type21(str, Enum):
     """
     Discriminator identifying this violation as `end`.
     """
@@ -1312,7 +1312,7 @@ class EndViolation(BaseModel):
     )
 
 
-class Type22(Enum):
+class Type22(str, Enum):
     """
     Discriminator identifying this violation as `skills`.
     """
@@ -1346,7 +1346,7 @@ class SkillsViolation(BaseModel):
     )
 
 
-class Type23(Enum):
+class Type23(str, Enum):
     """
     Discriminator identifying this violation as `forbiddenAssignment`.
     """
@@ -1377,7 +1377,7 @@ class ForbiddenAssignmentViolation(BaseModel):
     )
 
 
-class Type24(Enum):
+class Type24(str, Enum):
     """
     Discriminator identifying this violation as `authorizedTimeWindow`.
     """
@@ -1417,7 +1417,7 @@ class AuthorizedTimeWindowViolation(BaseModel):
     )
 
 
-class Type25(Enum):
+class Type25(str, Enum):
     """
     Discriminator identifying this violation as `capacity`.
     """
@@ -1452,7 +1452,7 @@ class CapacityViolation(BaseModel):
     overCapacity: float = Field(..., description='The exceeding capacity.')
 
 
-class Type26(Enum):
+class Type26(str, Enum):
     """
     Discriminator identifying this violation as `atLeastOneValidCapacity`.
     """
@@ -1485,7 +1485,7 @@ class AtLeastOneValidCapacityViolation(BaseModel):
     overCapacities: Capacities
 
 
-class Type27(Enum):
+class Type27(str, Enum):
     """
     Discriminator identifying this violation as `successiveStops`.
     """
@@ -1517,7 +1517,7 @@ class SuccessiveStopsViolation(BaseModel):
     )
 
 
-class Type28(Enum):
+class Type28(str, Enum):
     """
     Discriminator identifying this violation as `order`.
     """
@@ -1551,7 +1551,7 @@ class OrderViolation(BaseModel):
     )
 
 
-class Type29(Enum):
+class Type29(str, Enum):
     """
     Discriminator identifying this violation as `maxStopSpan`.
     """
@@ -1578,7 +1578,7 @@ class MaxStopSpanViolation(BaseModel):
     delay: Duration = Field(..., description='The delay that exceeds the MaxStopSpan.')
 
 
-class Type30(Enum):
+class Type30(str, Enum):
     """
     Discriminator identifying this violation as `workingTimeWindow`.
     """
@@ -1603,7 +1603,7 @@ class WorkingTimeWindowViolation(BaseModel):
     )
 
 
-class Type31(Enum):
+class Type31(str, Enum):
     """
     Discriminator identifying this violation as `maxWorkingDuration`.
     """
@@ -1634,7 +1634,7 @@ class MaxWorkingDurationViolation(BaseModel):
     )
 
 
-class Type32(Enum):
+class Type32(str, Enum):
     """
     Discriminator identifying this violation as `maxDistanceInKm`.
     """
@@ -1664,7 +1664,7 @@ class MaxDistanceInKmViolation(BaseModel):
     )
 
 
-class Type33(Enum):
+class Type33(str, Enum):
     """
     Discriminator identifying this violation as `maxInterStopDistanceInKm`.
     """
@@ -1701,7 +1701,7 @@ class MaxInterStopDistanceInKmViolation(BaseModel):
     )
 
 
-class Type34(Enum):
+class Type34(str, Enum):
     """
     Discriminator identifying this violation as `maxInterStopDuration`.
     """
@@ -1734,7 +1734,7 @@ class MaxInterStopDurationViolation(BaseModel):
     )
 
 
-class Type35(Enum):
+class Type35(str, Enum):
     """
     Discriminator identifying this violation as `stopIncompatibility`.
     """
@@ -1769,7 +1769,7 @@ class StopIncompatibilityViolation(BaseModel):
     tags: StopTagPair
 
 
-class Type36(Enum):
+class Type36(str, Enum):
     """
     Discriminator identifying this violation as `atLeastOneConstraint`.
     """
@@ -1777,7 +1777,7 @@ class Type36(Enum):
     atLeastOneConstraint = 'atLeastOneConstraint'
 
 
-class Type37(Enum):
+class Type37(str, Enum):
     """
     Discriminator identifying this violation as `maxStopTagGroups`.
     """
@@ -1804,7 +1804,7 @@ class ExceededNbGroups(BaseModel):
     )
 
 
-class Type38(Enum):
+class Type38(str, Enum):
     """
     Discriminator identifying this violation as `removalStrategy`.
     """
@@ -1812,7 +1812,7 @@ class Type38(Enum):
     removalStrategy = 'removalStrategy'
 
 
-class RemovalStrategyType(Enum):
+class RemovalStrategyType(str, Enum):
     """
     Unloading order enforced by an `AdditionalConstraintRemovalStrategy`. `lifo` is currently the only supported strategy.
     """
@@ -1820,7 +1820,7 @@ class RemovalStrategyType(Enum):
     lifo = 'lifo'
 
 
-class WayPointStatus(Enum):
+class WayPointStatus(str, Enum):
     """
     How a waypoint's timing was determined: `fixed` and `assigned` carry over the corresponding `AssignmentStatus` from the input `state`, while `optimized` means the engine chose the timing itself.
 
@@ -1831,7 +1831,7 @@ class WayPointStatus(Enum):
     optimized = 'optimized'
 
 
-class Type39(Enum):
+class Type39(str, Enum):
     """
     Discriminator identifying this waypoint as the tour's begin.
     """
@@ -1843,7 +1843,7 @@ class Status4(RootModel[WayPointStatus]):
     root: WayPointStatus
 
 
-class Type40(Enum):
+class Type40(str, Enum):
     """
     Discriminator identifying this waypoint as a stop.
     """
@@ -1851,7 +1851,7 @@ class Type40(Enum):
     stop = 'stop'
 
 
-class Type41(Enum):
+class Type41(str, Enum):
     """
     Discriminator identifying this waypoint as a break.
     """
@@ -1859,7 +1859,7 @@ class Type41(Enum):
     break_ = 'break'
 
 
-class Type42(Enum):
+class Type42(str, Enum):
     """
     Discriminator identifying this waypoint as the tour's end.
     """
@@ -1867,7 +1867,7 @@ class Type42(Enum):
     end = 'end'
 
 
-class Type43(Enum):
+class Type43(str, Enum):
     """
     Discriminator identifying this constraint as `incompatibleStopTags`.
     """
@@ -1901,7 +1901,7 @@ class AdditionalConstraintIncompatibleStopTags(BaseModel):
     )
 
 
-class Type44(Enum):
+class Type44(str, Enum):
     """
     Discriminator identifying this constraint as `forbiddenAssignment`.
     """
@@ -1935,7 +1935,7 @@ class AdditionalConstraintForbiddenAssignment(BaseModel):
     stopTag: RegexIdValidation = Field(..., description='Stop tag.', examples=['heavy'])
 
 
-class Type45(Enum):
+class Type45(str, Enum):
     """
     Discriminator identifying this constraint as `atLeastOneValidCapacity`.
     """
@@ -1974,7 +1974,7 @@ class AdditionalConstraintAtLeastOneValidCapacity(BaseModel):
     )
 
 
-class Type46(Enum):
+class Type46(str, Enum):
     """
     Discriminator identifying this constraint as `atLeastOneConstraint`.
     """
@@ -1982,7 +1982,7 @@ class Type46(Enum):
     atLeastOneConstraint = 'atLeastOneConstraint'
 
 
-class Type47(Enum):
+class Type47(str, Enum):
     """
     Discriminator identifying this constraint as `capacities`.
     """
@@ -2015,7 +2015,7 @@ class AdditionalConstraintCapacities(BaseModel):
     )
 
 
-class Type48(Enum):
+class Type48(str, Enum):
     """
     Discriminator identifying this constraint as `maxStopTagGroups`.
     """
@@ -2032,7 +2032,7 @@ class MaxGroupsByStopTag(RootModel[Dict[str, int]]):
     root: Dict[str, int]
 
 
-class Type49(Enum):
+class Type49(str, Enum):
     """
     Discriminator identifying this constraint as `removalStrategy`.
     """
@@ -2817,7 +2817,7 @@ class WayPointStop(BaseModel):
     )
     fromPrevious: Optional[FromPrevious] = None
     stopKind: Optional[StopKind] = Field(
-        'delivery',
+        StopKind.delivery,
         description="This stop's operation label, carried over from the stop itself.",
     )
 

@@ -15,6 +15,8 @@ python3 -m datamodel_code_generator \
   --use-schema-description \
   --extra-fields=allow \
   --field-constraints \
+  --use-subclass-enum \
+  --set-default-enum-member \
   --disable-timestamp \
   --output "$OUTPUT"
 

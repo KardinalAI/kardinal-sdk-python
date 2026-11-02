@@ -19,7 +19,7 @@ from . import _annotations  # import side effect: patches models.PlanId
 # back on PUT. It lives in _annotations.py because the message for an
 # unknown key needs it too, to say "the server assigns it".
 from ._annotations import PLAN_READ_ONLY_FIELDS as _PLAN_READ_ONLY_FIELDS
-from ._annotations import validate_response
+from ._annotations import _lenient_enums, validate_response
 from . import models
 
 
@@ -348,10 +348,12 @@ class PlansAPI:
         )
         return validate_response(models.EnvelopedPlanReference, response)
 
-    def get_status(self, plan_id: str) -> Union[models.PlanState, str]:
+    def get_status(self, plan_id: str) -> models.PlanState:
         """`GET /plans/{id}/state`. Returns the plan's current `PlanState`
-        (`waiting`, `processing`, ..., `optimized`, `stopped`, ...), or the
-        raw string for a state this version of the SDK doesn't know yet.
+        (`waiting`, `processing`, ..., `optimized`, `stopped`, ...). It is a
+        `str` enum: `== "optimized"` and `str(state)` work. A state this
+        version of the SDK doesn't know yet is still a `PlanState`, equal to
+        its raw string.
 
         The type returned is `PlanState` (the enum this endpoint's `state`
         field actually carries), not the unrelated `PlanStatus` object
@@ -360,15 +362,13 @@ class PlansAPI:
         """
         return self._get_state(plan_id)[0]
 
-    def _get_state(self, plan_id: str) -> Tuple[Union[models.PlanState, str], Optional[int]]:
+    def _get_state(self, plan_id: str) -> Tuple[models.PlanState, Optional[int]]:
         """`get_status()` plus the `planVersion` that state belongs to —
         `solutions.wait()` needs both, since right after `update()` this
         endpoint can still report the previous version's state.
         """
         response = self._transport.request("GET", f"/plans/{plan_id}/state")
         item = response["item"]
-        try:
-            state: Union[models.PlanState, str] = models.PlanState(item["state"])
-        except ValueError:
-            state = item["state"]
+        with _lenient_enums():
+            state = models.PlanState(item["state"])
         return state, item.get("planVersion")
