@@ -122,7 +122,7 @@ def test_start_and_stop_send_boolean_body_and_return_the_plan_reference() -> Non
     reference = plans.start("p1")
     assert route.calls.last.request.content == b"true"
     assert reference.planId == "p1"
-    assert reference.planVersion.root == 3
+    assert reference.planVersion == 3
     reference = plans.stop("p1")
     assert route.calls.last.request.content == b"false"
     assert reference.planId == "p1"
@@ -358,7 +358,7 @@ def test_a_default_set_by_the_caller_is_sent() -> None:
     plan = plans.get(_PLAN_ID)
     plan.lateDeparture = False
     plan.resources[0].priority = 2
-    plan.objectives.root[1].disableGroupProximity = True
+    plan.objectives[1].disableGroupProximity = True
     plans.update(plan)
     sent = json.loads(route.calls.last.request.content)
     assert sent["lateDeparture"] is False
@@ -399,9 +399,9 @@ def test_responses_with_enum_values_this_sdk_does_not_know_still_parse() -> None
     )
     plans = _plans()
     plan = plans.submit(PlanCreate(resources=[]))
-    assert plan.state.root.value == "someFutureState"
+    assert plan.state.value == "someFutureState"
     assert plan.warnings[0].code.value == "SOME_FUTURE_CODE"
-    assert plans.list().items[0].state.root.value == "someFutureState"
+    assert plans.list().items[0].state.value == "someFutureState"
 
 
 def test_a_hand_built_plan_still_rejects_an_unknown_enum_value() -> None:

@@ -130,9 +130,9 @@ class SolutionsAPI:
         start = time.monotonic()
         deadline = None if timeout is None else start + timeout
         plan = self._plans.get(plan_id)
-        version = plan.version.root if plan.version is not None else None
+        version = plan.version
         budget = (
-            parse_duration(plan.maxOptimizationDuration.root).total_seconds()
+            parse_duration(plan.maxOptimizationDuration).total_seconds()
             if plan.maxOptimizationDuration is not None
             else None
         )
@@ -228,7 +228,7 @@ class SolutionsAPI:
         if solution is None or (
             version is not None
             and solution.planVersion is not None
-            and solution.planVersion.root != version
+            and solution.planVersion != version
         ):
             raise KardinalOptimizationError(
                 f"Plan {plan_id!r} ended ({state.value}) without a solution "

@@ -124,7 +124,7 @@ def test_wait_keeps_waiting_while_state_still_reports_the_previous_version(clock
 
     solution = solutions.wait(_PLAN_ID)
 
-    assert solution.planVersion.root == 2
+    assert solution.planVersion == 2
     assert clock[0] == 30
 
 

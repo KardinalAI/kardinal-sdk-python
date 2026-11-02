@@ -61,7 +61,7 @@ def small_delivery_plan() -> PlanCreate:
             vehicleProfile=models.VehicleProfileCar(type="car"),
             departure=_DEPOT,
             workingTimeWindow=working_time_window,
-            capacities=models.Capacities({"packages": 20}),
+            capacities={"packages": 20},
         )
         for i in range(1, 3)
     ]
@@ -75,7 +75,7 @@ def small_delivery_plan() -> PlanCreate:
                     id=f"stop-{i}",
                     position=position,
                     operationDuration="PT5M",
-                    capacities=models.Capacities({"packages": 1}),
+                    capacities={"packages": 1},
                 )
             ],
         )

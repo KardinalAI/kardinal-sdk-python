@@ -17,13 +17,10 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from enum import Enum
 from typing import Any, Iterator, NamedTuple, Optional, Type, TypeVar
-from uuid import UUID
 
 from pydantic import BaseModel, RootModel
 
 from . import models
-
-_SCALAR_ROOT_TYPES = (str, int, float, bool, UUID, Enum)
 
 
 def _generated_models() -> list[type[BaseModel]]:
@@ -206,68 +203,6 @@ def _patch_broken_plan_id() -> bool:
 
 
 PLAN_ID_PATCH_APPLIED = _patch_broken_plan_id()
-
-
-def _patch_scalar_root_equality() -> bool:
-    """A generated `RootModel[str]`/`[int]`/`[UUID]`/`[Enum]` (`RegexIdValidation`,
-    `PlanVersion`, `Duration`, `TimeZone`, `AgencyId`, `DateTime`, `CountryCode`,
-    `UUIDModel`, ...) wraps its value instead of being it: pydantic's default
-    `BaseModel.__eq__` only considers two instances equal if they're the same
-    model class with equal fields, so `tour.resourceId == "truck-1"` is always
-    `False` even though `resourceId` is conceptually a plain string, and
-    `str(tour.resourceId)` prints `"root='truck-1'"` instead of `"truck-1"`.
-    `RootModel` also inherits `BaseModel`'s unhashable-by-default `__hash__`.
-
-    Scoped to *scalar* root types only (via `dir(models)` introspection, same
-    pattern as `_patch_broken_plan_id` above, so it stays correct across
-    regeneration without a hand-maintained class list). Composite root models
-    (`RootModel[List[...]]`, `RootModel[Dict[...]]`, `RootModel[Union[...]]`,
-    e.g. `StopTagPair`, `CountryCodes`) are deliberately left untouched: a
-    transparent `__eq__`/`__str__` is unambiguous for a scalar but not for a
-    collection, where it could hide accidental comparisons against the wrong
-    shape.
-
-    Network (de)serialization is unaffected either way: `model_dump(mode="json")`
-    already unwraps `.root` regardless of these dunder methods.
-    """
-    patched_any = False
-    for name in dir(models):
-        cls = getattr(models, name)
-        if not (isinstance(cls, type) and issubclass(cls, models.RootModel)):
-            continue
-        if cls is models.RootModel:
-            continue
-        field = cls.model_fields.get("root")
-        if field is None or not (
-            isinstance(field.annotation, type)
-            and issubclass(field.annotation, _SCALAR_ROOT_TYPES)
-        ):
-            continue
-
-        def _eq(self: Any, other: object, _cls: type = cls) -> bool:
-            if isinstance(other, _cls):
-                return bool(self.root == other.root)  # type: ignore[attr-defined]
-            return bool(self.root == other)
-
-        def _hash(self: Any) -> int:
-            return hash(self.root)
-
-        def _str(self: Any) -> str:
-            return str(self.root)
-
-        def _format(self: Any, format_spec: str) -> str:
-            return format(self.root, format_spec)
-
-        # setattr: these replace methods on a class generated elsewhere.
-        setattr(cls, "__eq__", _eq)
-        setattr(cls, "__hash__", _hash)
-        setattr(cls, "__str__", _str)
-        setattr(cls, "__format__", _format)
-        patched_any = True
-    return patched_any
-
-
-SCALAR_ROOT_EQUALITY_PATCH_APPLIED = _patch_scalar_root_equality()
 
 
 # Set while parsing a response from the server, never while validating what

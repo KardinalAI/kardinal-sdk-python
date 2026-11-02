@@ -4,18 +4,13 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Literal, Optional, Union
+from typing import Annotated, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel
 
 
-class RegexIdValidation(RootModel[str]):
-    root: str = Field(
-        ...,
-        description='At least one character among those allowed: unaccented alpha-numeric characters, "-", ".", "_", "~", ":", "@", "!", "$", ",".\n\nId-uniqueness is scoped per collection, not global: `resources[].id`, `orders[].id`, and `stops[].id` are each their own namespace, so the same string can be reused across `resources`, `orders`, and `stops` in the same plan without a collision.\n',
-        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
-    )
+RegexIdValidation = Annotated[str, Field(pattern='^[a-zA-Z0-9-._~:@!$,]+$')]
 
 
 class ForbiddenAssignment(BaseModel):
@@ -26,37 +21,18 @@ class ForbiddenAssignment(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    resourceTag: RegexIdValidation = Field(
-        ..., description='Resource tag.', examples=['trailer']
-    )
-    stopTag: RegexIdValidation = Field(..., description='Stop tag.', examples=['heavy'])
-
-
-class StopTagPair(RootModel[List[RegexIdValidation]]):
-    """
-    A pair of incompatible stop tags.
-    """
-
-    root: List[RegexIdValidation] = Field(
+    resourceTag: str = Field(
         ...,
-        description='A pair of incompatible stop tags.',
-        examples=[['goat', 'cabbage']],
-        max_length=2,
-        min_length=2,
+        description='Resource tag.',
+        examples=['trailer'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
-
-
-class AgencyId(RootModel[str]):
-    root: str = Field(
+    stopTag: str = Field(
         ...,
-        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
-        examples=['BLD1234567_production'],
-        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+        description='Stop tag.',
+        examples=['heavy'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
-
-
-class PlanVersion(RootModel[int]):
-    root: int = Field(..., description='The plan version.', examples=[42], ge=1)
 
 
 class PlanState(str, Enum):
@@ -86,14 +62,6 @@ class PlanState(str, Enum):
     interrupted = 'interrupted'
 
 
-class State2(RootModel[PlanState]):
-    """
-    The plan's state at `timestamp`.
-    """
-
-    root: PlanState
-
-
 class PlanStatusVersion(BaseModel):
     """
     Which plan version is waiting to enter a given pipeline stage versus already running through it.
@@ -102,21 +70,12 @@ class PlanStatusVersion(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    waitingVersion: Optional[PlanVersion] = Field(
-        None, description='The version currently waiting.'
+    waitingVersion: Optional[int] = Field(
+        None, description='The version currently waiting.', examples=[42], ge=1
     )
-    runningVersion: Optional[PlanVersion] = Field(
-        None, description='The version currently running.'
+    runningVersion: Optional[int] = Field(
+        None, description='The version currently running.', examples=[42], ge=1
     )
-
-
-class Properties(RootModel[Dict[str, str]]):
-    """
-    Free-form metadata map (string to string), with no effect on optimization. Returned unchanged on the object and in the solution. Typical uses: a driver's name, a vehicle's plate, a customer name or address, a client reference.
-
-    """
-
-    root: Dict[str, str]
 
 
 class MaxInterStopDistanceInKmBounds(BaseModel):
@@ -181,10 +140,6 @@ class Type(str, Enum):
     single = 'single'
 
 
-class Kind(RootModel[StopKind]):
-    root: StopKind
-
-
 class Type1(str, Enum):
     """
     Discriminator identifying this stop as an `alternatives` group.
@@ -245,15 +200,17 @@ class StopTagPrecedencePair(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    previous: RegexIdValidation = Field(
+    previous: str = Field(
         ...,
         description='Stop tag that the engine tries to visit before any stop tagged `next` in the same tour.',
         examples=['sector1'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
-    next: RegexIdValidation = Field(
+    next: str = Field(
         ...,
         description='Stop tag that the engine tries to visit only after every stop tagged `previous` in the same tour.',
         examples=['sector2'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
 
 
@@ -302,15 +259,6 @@ class CostRange(BaseModel):
     max: float = Field(..., description='The maximum cost', examples=[58.6])
 
 
-class CostsByCurrency(RootModel[Dict[str, CostRange]]):
-    """
-    Cost ranges mapped by currency code. Each currency code is a three-letter string following the ISO 4217 specification (for example `EUR`, `CHF`). See https://en.wikipedia.org/wiki/ISO_4217 for more details.
-
-    """
-
-    root: Dict[str, CostRange]
-
-
 class Type4(str, Enum):
     """
     Discriminator identifying this objective as `custom`.
@@ -328,29 +276,7 @@ class OptimizationDirection(str, Enum):
     maximize = 'maximize'
 
 
-class Duration(RootModel[str]):
-    root: str = Field(
-        ...,
-        description='A period of time, expressed in the ISO8601 **duration** format.',
-        examples=['PT4M'],
-        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
-    )
-
-
-class DateTime(RootModel[str]):
-    root: str = Field(
-        ...,
-        description='A full calendar date and time, in ISO 8601 format, for example `2019-11-15T12:34:56Z`.\n\nA client can send the time in UTC with a `Z` suffix, or with an explicit UTC offset such as `+01:00`. Milliseconds in a `Z` datetime are accepted and dropped. When the object carries a `tz` value (see `TimeZone`), a local datetime with a space between date and time, such as `2019-11-15 12:34`, is also accepted. The API returns read-only datetimes such as `createdAt` in `Z` form. Other datetimes are written back in the offset of `tz` when it is set. Without `tz`, the stored plan keeps the form you sent, and the solution uses `Z`.\n\nSee [Dates and time zones](https://developers.kardinal.ai/reference/data-model#dates-and-time-zones).\n\n> **Modelling pitfall.** A local datetime with no `Z` and no offset is rejected with HTTP 400, whether it uses a `T` (`2019-11-15T12:34:00`) or a space, unless a `tz` value is set and the separator is a space.\n',
-        examples=['2019-11-15T12:34:56Z'],
-    )
-
-
-class TimeZone(RootModel[str]):
-    root: str = Field(
-        ...,
-        description='IANA time zone identifier (the "tz database"), used to interpret a local datetime that has no explicit UTC offset.\n\nA datetime can always be given in ISO 8601 with an explicit offset or `Z`, for example these three values for the same instant: `2025-05-22T05:43:00Z`, `2025-05-22T06:43:00+01:00`, `2025-05-22T07:43:00+02:00`. Pairing a local datetime with a `tz` value is a more human-readable alternative input: `2025-05-22 07:43` with `tz: "Europe/Paris"` denotes that same instant, and seconds are optional.\n\nWith `tz`, a local datetime must use a space between date and time. The `T` form without `Z` and without an offset (`2025-05-22T07:43:00`) is rejected. Without `tz`, any local datetime is rejected with HTTP 400, not read as UTC. A `Z` or an offset in a datetime always wins over `tz`. Use one form for every datetime of a plan: a plan that mixes local datetimes with `Z` or offset datetimes returns no error, but a window whose two ends use different forms can shrink without warning. Milliseconds in a `Z` datetime are accepted and dropped. The offset follows the date: for example, `Europe/Paris` gives `+02:00` in summer and `+01:00` in winter.\n\nWhen `tz` is set, the API writes the datetimes of the stored plan and of the solution back in the offset of that zone, even if they were sent as `Z`. Read-only fields such as `createdAt` are always in `Z`. Set `tz` in every plan, even when every datetime carries an offset, so that responses are consistent.\n\nWhere a JSON input object accepts a `tz` property, every local datetime found elsewhere in that same object is converted to ISO 8601 using it before further processing.\n\nSee [Dates and time zones](https://developers.kardinal.ai/reference/data-model#dates-and-time-zones).\n\n> **Modelling pitfall.** A `properties` sub-object (free-form client data, see the `Properties` schema) is never scanned for local datetimes, regardless of `tz`.\n',
-        examples=['Europe/Paris'],
-    )
+Duration = Annotated[str, Field(pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$')]
 
 
 class Position(BaseModel):
@@ -385,8 +311,11 @@ class FromPrevious(BaseModel):
         description='Distance travelled from the previous waypoint, in kilometres.',
         examples=[2.3269331],
     )
-    travelDuration: Duration = Field(
-        ..., description='Time spent travelling from the previous waypoint.'
+    travelDuration: str = Field(
+        ...,
+        description='Time spent travelling from the previous waypoint.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
 
 
@@ -397,19 +326,6 @@ class AtFirstPositionArrival(str, Enum):
     """
 
     atFirstPosition = 'atFirstPosition'
-
-
-class Capacities(RootModel[Dict[str, float]]):
-    """
-    Free-form map from a capacity name to a quantity, tracked as its own independent dimension on both resources and stops. For every key a resource declares, the running total never exceeds the resource's value for that key at any point in the tour. A key the stop consumes but the resource doesn't declare is unconstrained on that resource.
-
-    > **When to use.** For a vehicle carrying exactly one item at a time whose size varies by trip, a count-based ceiling (`{"containers": 1}`) is robust to size variance; a size-based ceiling (`{"volume": <max item size>}`) is needed only when overflow or partial-load reporting matters.
-
-    > **Modelling pitfall.** Capacity keys are matched by exact string, with no case-folding. A typo such as `weight` on a resource against `Weight` on a stop raises no error: it silently leaves that dimension unlimited for the stop instead of enforcing the resource's ceiling.
-
-    """
-
-    root: Dict[str, float]
 
 
 class TaggedTimeWindow(BaseModel):
@@ -425,8 +341,12 @@ class TaggedTimeWindow(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    begin: DateTime = Field(..., description='Start of the window.')
-    end: DateTime = Field(..., description='End of the window.')
+    begin: str = Field(
+        ..., description='Start of the window.', examples=['2019-11-15T12:34:56Z']
+    )
+    end: str = Field(
+        ..., description='End of the window.', examples=['2019-11-15T12:34:56Z']
+    )
     resourceTags: Optional[List[RegexIdValidation]] = Field(
         None,
         description='Resource tags the window is restricted to. Omit to apply the window to every resource regardless of tag.',
@@ -443,8 +363,12 @@ class TimeWindow(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    begin: DateTime = Field(..., description='Start of the window.')
-    end: DateTime = Field(..., description='End of the window.')
+    begin: str = Field(
+        ..., description='Start of the window.', examples=['2019-11-15T12:34:56Z']
+    )
+    end: str = Field(
+        ..., description='End of the window.', examples=['2019-11-15T12:34:56Z']
+    )
 
 
 class Type5(str, Enum):
@@ -469,7 +393,12 @@ class TimeWindowBreak(BaseModel):
     type: Literal['timeWindowBreak'] = Field(
         ..., description='Discriminator identifying this break as `timeWindowBreak`.'
     )
-    duration: Duration
+    duration: str = Field(
+        ...,
+        description='A period of time, expressed in the ISO8601 **duration** format.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
+    )
     timeWindow: TimeWindow = Field(
         ...,
         examples=[
@@ -501,8 +430,18 @@ class TravelDurationSlidingBreak(BaseModel):
         ...,
         description='Discriminator identifying this break as `travelDurationSlidingBreak`.',
     )
-    minBreakDuration: Duration
-    maxInterBreakDuration: Duration
+    minBreakDuration: str = Field(
+        ...,
+        description='A period of time, expressed in the ISO8601 **duration** format.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
+    )
+    maxInterBreakDuration: str = Field(
+        ...,
+        description='A period of time, expressed in the ISO8601 **duration** format.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
+    )
 
 
 class Type7(str, Enum):
@@ -528,8 +467,18 @@ class WorkingDurationSlidingBreak(BaseModel):
         ...,
         description='Discriminator identifying this break as `workingDurationSlidingBreak`.',
     )
-    minBreakDuration: Duration
-    maxInterBreakDuration: Duration
+    minBreakDuration: str = Field(
+        ...,
+        description='A period of time, expressed in the ISO8601 **duration** format.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
+    )
+    maxInterBreakDuration: str = Field(
+        ...,
+        description='A period of time, expressed in the ISO8601 **duration** format.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
+    )
 
 
 class AvoidEarlyLoading(BaseModel):
@@ -547,10 +496,11 @@ class AvoidEarlyLoading(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    stopTag: RegexIdValidation = Field(
+    stopTag: str = Field(
         ...,
         description="Stop tag of the stops where loading early should be avoided, for example a depot's tag.",
         examples=['depot1'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
     capacities: Optional[List[str]] = Field(
         None,
@@ -584,26 +534,6 @@ class OperationDurationPolicy(BaseModel):
         None,
         description='Stop tags this policy applies to.',
         examples=[['access:parking33', 'capa:bat22', 'setup:france']],
-    )
-
-
-class CountryCode(RootModel[str]):
-    root: str = Field(
-        ...,
-        description="A country's standard name, Alpha-2 code, or Alpha-3 code.",
-        examples=['Switzerland'],
-    )
-
-
-class CountryCodes(RootModel[List[CountryCode]]):
-    """
-    Countries to exclude from routing, mixing any combination of standard names, Alpha-2 codes, and Alpha-3 codes.
-    """
-
-    root: List[CountryCode] = Field(
-        ...,
-        description='Countries to exclude from routing, mixing any combination of standard names, Alpha-2 codes, and Alpha-3 codes.',
-        examples=[['Switzerland', 'BE', 'ITA']],
     )
 
 
@@ -665,8 +595,10 @@ class VehicleProfilePedestrian(BaseModel):
     avoidDirtRoad: Optional[bool] = Field(
         None, description='Excludes unpaved or dirt roads from computed routes.'
     )
-    excludedCountries: Optional[CountryCodes] = Field(
-        None, description='Countries to route around entirely.'
+    excludedCountries: Optional[List[str]] = Field(
+        None,
+        description='Countries to route around entirely.',
+        examples=[['Switzerland', 'BE', 'ITA']],
     )
 
 
@@ -701,8 +633,10 @@ class VehicleProfileBicycle(BaseModel):
     avoidDirtRoad: Optional[bool] = Field(
         None, description='Excludes unpaved or dirt roads from computed routes.'
     )
-    excludedCountries: Optional[CountryCodes] = Field(
-        None, description='Countries to route around entirely.'
+    excludedCountries: Optional[List[str]] = Field(
+        None,
+        description='Countries to route around entirely.',
+        examples=[['Switzerland', 'BE', 'ITA']],
     )
 
 
@@ -740,8 +674,10 @@ class VehicleProfileScooter(BaseModel):
     avoidDirtRoad: Optional[bool] = Field(
         None, description='Excludes unpaved or dirt roads from computed routes.'
     )
-    excludedCountries: Optional[CountryCodes] = Field(
-        None, description='Countries to route around entirely.'
+    excludedCountries: Optional[List[str]] = Field(
+        None,
+        description='Countries to route around entirely.',
+        examples=[['Switzerland', 'BE', 'ITA']],
     )
     speedCap: Optional[float] = Field(
         None,
@@ -789,8 +725,10 @@ class VehicleProfileMotorbike(BaseModel):
     avoidDirtRoad: Optional[bool] = Field(
         None, description='Excludes unpaved or dirt roads from computed routes.'
     )
-    excludedCountries: Optional[CountryCodes] = Field(
-        None, description='Countries to route around entirely.'
+    excludedCountries: Optional[List[str]] = Field(
+        None,
+        description='Countries to route around entirely.',
+        examples=[['Switzerland', 'BE', 'ITA']],
     )
     speedCap: Optional[float] = Field(
         None,
@@ -847,8 +785,10 @@ class VehicleProfileCar(BaseModel):
     avoidUTurns: Optional[bool] = Field(
         None, description='Excludes U-turns from computed routes.'
     )
-    excludedCountries: Optional[CountryCodes] = Field(
-        None, description='Countries to route around entirely.'
+    excludedCountries: Optional[List[str]] = Field(
+        None,
+        description='Countries to route around entirely.',
+        examples=[['Switzerland', 'BE', 'ITA']],
     )
     speedCap: Optional[float] = Field(
         None,
@@ -953,10 +893,6 @@ class CostFloorsAndCoeffs(BaseModel):
     )
 
 
-class Mode(RootModel[ResourceMode]):
-    root: ResourceMode
-
-
 class AssignmentStatus(str, Enum):
     """
     How an entry in `state.assignments` is treated: taken as given, with its position in the sequence and its pinned times left unchallenged (`fixed`), or only assigned to this resource, with the engine sequencing it according to the plan's objectives (`assigned`).
@@ -975,10 +911,6 @@ class Type15(str, Enum):
     stop = 'stop'
 
 
-class Status(RootModel[AssignmentStatus]):
-    root: AssignmentStatus
-
-
 class AssignmentStop(BaseModel):
     """
     Pins a stop onto a resource's tour. `beginTime` defaults to `arrivalTime` when omitted. If `stopId` is the id of an `AlternativesStop` alternative, `arrivalTime`, `beginTime`, and `departureTime` cannot be set: the engine still chooses and times the alternative itself.
@@ -991,19 +923,27 @@ class AssignmentStop(BaseModel):
     type: Literal['stop'] = Field(
         ..., description='Discriminator identifying this waypoint as a stop.'
     )
-    status: Optional[Status] = None
-    stopId: RegexIdValidation = Field(
-        ..., description='Id of the pinned stop.', examples=['stop1']
+    status: Optional[AssignmentStatus] = None
+    stopId: str = Field(
+        ...,
+        description='Id of the pinned stop.',
+        examples=['stop1'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
-    arrivalTime: Optional[DateTime] = Field(
-        None, description='Time the resource reaches the stop.'
+    arrivalTime: Optional[str] = Field(
+        None,
+        description='Time the resource reaches the stop.',
+        examples=['2019-11-15T12:34:56Z'],
     )
-    beginTime: Optional[DateTime] = Field(
+    beginTime: Optional[str] = Field(
         None,
         description='Time the resource starts serving the stop. Defaults to `arrivalTime` when omitted.',
+        examples=['2019-11-15T12:34:56Z'],
     )
-    departureTime: Optional[DateTime] = Field(
-        None, description='Time the resource leaves the stop.'
+    departureTime: Optional[str] = Field(
+        None,
+        description='Time the resource leaves the stop.',
+        examples=['2019-11-15T12:34:56Z'],
     )
 
 
@@ -1026,8 +966,10 @@ class AssignmentBegin(BaseModel):
     type: Literal['begin'] = Field(
         ..., description="Discriminator identifying this waypoint as the tour's begin."
     )
-    status: Optional[Status] = None
-    departureTime: DateTime = Field(..., description='Time the resource departs.')
+    status: Optional[AssignmentStatus] = None
+    departureTime: str = Field(
+        ..., description='Time the resource departs.', examples=['2019-11-15T12:34:56Z']
+    )
 
 
 class Type17(str, Enum):
@@ -1049,14 +991,16 @@ class AssignmentBreak(BaseModel):
     type: Literal['break'] = Field(
         ..., description='Discriminator identifying this waypoint as a break.'
     )
-    status: Optional[Status] = None
-    arrivalTime: DateTime = Field(
+    status: Optional[AssignmentStatus] = None
+    arrivalTime: str = Field(
         ...,
         description='Time the break waypoint starts. It can be earlier than the break itself, for example when the waypoint includes a wait.',
+        examples=['2019-11-15T12:34:56Z'],
     )
-    departureTime: DateTime = Field(
+    departureTime: str = Field(
         ...,
         description='Time the break ends.\n\n> **Modelling pitfall.** `arrivalTime` and `departureTime` show where and when the engine placed the break. They do not show how long the break lasted, and the span can be longer than the break, for example when it includes a wait.\n',
+        examples=['2019-11-15T12:34:56Z'],
     )
 
 
@@ -1079,21 +1023,12 @@ class AssignmentEnd(BaseModel):
     type: Literal['end'] = Field(
         ..., description="Discriminator identifying this waypoint as the tour's end."
     )
-    status: Optional[Status] = None
-    arrivalTime: DateTime = Field(
-        ..., description='Time the resource arrives at the end of its tour.'
+    status: Optional[AssignmentStatus] = None
+    arrivalTime: str = Field(
+        ...,
+        description='Time the resource arrives at the end of its tour.',
+        examples=['2019-11-15T12:34:56Z'],
     )
-
-
-class ErrorProperties(RootModel[Dict[str, str]]):
-    """
-    Optional extra context for the error, when the API provides any.
-
-    The exact keys returned in `properties` for a given `code` (for example, which field name or invalid value is included in an `INVALID_VALUE` or `INVALID_ID_REFERENCE` error) are not yet documented per `code`. Treat any `properties` content as informational and not stable.
-
-    """
-
-    root: Dict[str, str]
 
 
 class Code(str, Enum):
@@ -1158,7 +1093,7 @@ class Error(BaseModel):
         description='Default, human-readable message. Useful for logs; not meant to be parsed.',
         examples=['The field value is not valid.'],
     )
-    properties: Optional[ErrorProperties] = None
+    properties: Optional[Dict[str, str]] = None
 
 
 class Warning(Error):
@@ -1178,14 +1113,6 @@ class Warning(Error):
     )
 
 
-class Direction1(RootModel[OptimizationDirection]):
-    """
-    Whether this objective's value was minimized or maximized.
-    """
-
-    root: OptimizationDirection
-
-
 class SolutionObjective(BaseModel):
     """
     Achieved value of one objective from `Plan.objectives`.
@@ -1203,21 +1130,13 @@ class SolutionObjective(BaseModel):
         None,
         description='Priority level covered by this objective entry. Only set for `maximizeMandatoryStops`, `maximizeOptionalStops`, and `minimizeResources`, which the engine splits into one entry per `priority` value present in the plan, so the same objective can appear once per level.',
     )
-    direction: Optional[Direction1] = Field(
+    direction: Optional[OptimizationDirection] = Field(
         None, description="Whether this objective's value was minimized or maximized."
     )
     value: Optional[float] = Field(
         None,
         description="Achieved value of the objective for this solution, in the objective's own unit. The value is not rounded.\n\n- Hours, as a decimal number (`1.25` is 1 h 15 min): `minimizeDelay`, `minimizeWorkingDuration`, `minimizeLargestTourDuration`.\n- Kilometres: `minimizeDistance`.\n- The currency of your `cost` coefficients, with no conversion: `minimizeCosts`.\n- The unit of its own coefficients: a `custom` objective.\n- A count, with no unit: `maximizeMandatoryStops`, `maximizeOptionalStops`, `maximizePreferredStops`, `minimizeResources`, `minimizeOverOverlappingCapacitiesOnStops`, `minimizeEarlyLoadings`.\n",
     )
-
-
-class Mode1(RootModel[ResourceMode]):
-    """
-    Resource mode this tour was computed under.
-    """
-
-    root: ResourceMode
 
 
 class Type19(str, Enum):
@@ -1412,8 +1331,10 @@ class AuthorizedTimeWindowViolation(BaseModel):
             {'begin': '2026-03-17T08:00:00+01:00', 'end': '2026-03-17T12:00:00+01:00'}
         ],
     )
-    actualTime: DateTime = Field(
-        ..., description='The time at which the waypoint is actually executed.'
+    actualTime: str = Field(
+        ...,
+        description='The time at which the waypoint is actually executed.',
+        examples=['2019-11-15T12:34:56Z'],
     )
 
 
@@ -1482,7 +1403,7 @@ class AtLeastOneValidCapacityViolation(BaseModel):
         description='The name of the AtLeastOneValidCapacity constraint the violation is linked to.',
         examples=['capacityCheck1'],
     )
-    overCapacities: Capacities
+    overCapacities: Dict[str, float]
 
 
 class Type27(str, Enum):
@@ -1570,12 +1491,18 @@ class MaxStopSpanViolation(BaseModel):
     type: Literal['maxStopSpan'] = Field(
         ..., description='Discriminator identifying this violation as `maxStopSpan`.'
     )
-    orderId: RegexIdValidation = Field(
+    orderId: str = Field(
         ...,
         description='The order id with the MaxStopSpan constraint violation.',
         examples=['order1'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
-    delay: Duration = Field(..., description='The delay that exceeds the MaxStopSpan.')
+    delay: str = Field(
+        ...,
+        description='The delay that exceeds the MaxStopSpan.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
+    )
 
 
 class Type30(str, Enum):
@@ -1598,8 +1525,11 @@ class WorkingTimeWindowViolation(BaseModel):
         ...,
         description='Discriminator identifying this violation as `workingTimeWindow`.',
     )
-    delay: Duration = Field(
-        ..., description="The delay that exceeds the resource's TimeWindow."
+    delay: str = Field(
+        ...,
+        description="The delay that exceeds the resource's TimeWindow.",
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
 
 
@@ -1626,11 +1556,17 @@ class MaxWorkingDurationViolation(BaseModel):
         ...,
         description='Discriminator identifying this violation as `maxWorkingDuration`.',
     )
-    maxWorkingDuration: Duration = Field(
-        ..., description='The expected maximum working duration.'
+    maxWorkingDuration: str = Field(
+        ...,
+        description='The expected maximum working duration.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
-    exceededDuration: Duration = Field(
-        ..., description='The duration that exceeds the maximum working duration.'
+    exceededDuration: str = Field(
+        ...,
+        description='The duration that exceeds the maximum working duration.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
 
 
@@ -1726,11 +1662,17 @@ class MaxInterStopDurationViolation(BaseModel):
         description='The index of the waypoint the violation applies to.',
         examples=[0],
     )
-    maxInterStopDuration: Duration = Field(
-        ..., description='The expected maximum inter-stop duration.'
+    maxInterStopDuration: str = Field(
+        ...,
+        description='The expected maximum inter-stop duration.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
-    exceededDuration: Duration = Field(
-        ..., description='The inter-stop duration that exceeds the maximum duration.'
+    exceededDuration: str = Field(
+        ...,
+        description='The inter-stop duration that exceeds the maximum duration.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
 
 
@@ -1766,7 +1708,13 @@ class StopIncompatibilityViolation(BaseModel):
     incompatibilities: List[Incompatibility] = Field(
         ..., description='Lists of stop ids for each incompatible tag.'
     )
-    tags: StopTagPair
+    tags: List[RegexIdValidation] = Field(
+        ...,
+        description='A pair of incompatible stop tags.',
+        examples=[['goat', 'cabbage']],
+        max_length=2,
+        min_length=2,
+    )
 
 
 class Type36(str, Enum):
@@ -1839,10 +1787,6 @@ class Type39(str, Enum):
     begin = 'begin'
 
 
-class Status4(RootModel[WayPointStatus]):
-    root: WayPointStatus
-
-
 class Type40(str, Enum):
     """
     Discriminator identifying this waypoint as a stop.
@@ -1893,7 +1837,13 @@ class AdditionalConstraintIncompatibleStopTags(BaseModel):
         description='Name identifying this constraint, referenced by any resulting `StopIncompatibilityViolation`.',
         examples=['noOverlap1'],
     )
-    stopTags: StopTagPair
+    stopTags: List[RegexIdValidation] = Field(
+        ...,
+        description='A pair of incompatible stop tags.',
+        examples=[['goat', 'cabbage']],
+        max_length=2,
+        min_length=2,
+    )
     resourceTags: Optional[List[RegexIdValidation]] = Field(
         None,
         description='Resource tags this constraint applies to.',
@@ -1929,10 +1879,18 @@ class AdditionalConstraintForbiddenAssignment(BaseModel):
         description='Name identifying this constraint, referenced by any resulting `ForbiddenAssignmentViolation`.',
         examples=['noTrailerAtWarehouse'],
     )
-    resourceTag: RegexIdValidation = Field(
-        ..., description='Resource tag.', examples=['trailer']
+    resourceTag: str = Field(
+        ...,
+        description='Resource tag.',
+        examples=['trailer'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
-    stopTag: RegexIdValidation = Field(..., description='Stop tag.', examples=['heavy'])
+    stopTag: str = Field(
+        ...,
+        description='Stop tag.',
+        examples=['heavy'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
+    )
 
 
 class Type45(str, Enum):
@@ -1963,7 +1921,7 @@ class AdditionalConstraintAtLeastOneValidCapacity(BaseModel):
         description='Name identifying this constraint, referenced by any resulting `AtLeastOneValidCapacityViolation`.',
         examples=['capacityCheck1'],
     )
-    capacities: Capacities = Field(
+    capacities: Dict[str, float] = Field(
         ...,
         description='Capacity thresholds; at every stop, at least one of these must hold.',
     )
@@ -2007,11 +1965,14 @@ class AdditionalConstraintCapacities(BaseModel):
         description='Name identifying this constraint. No violation is currently reported for this constraint type.',
         examples=['capacityLimit1'],
     )
-    capacities: Capacities = Field(
+    capacities: Dict[str, float] = Field(
         ..., description='Capacities that must be satisfied.'
     )
-    resourceTag: RegexIdValidation = Field(
-        ..., description='Resource tag.', examples=['trailer']
+    resourceTag: str = Field(
+        ...,
+        description='Resource tag.',
+        examples=['trailer'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
 
 
@@ -2023,25 +1984,12 @@ class Type48(str, Enum):
     maxStopTagGroups = 'maxStopTagGroups'
 
 
-class MaxGroupsByStopTag(RootModel[Dict[str, int]]):
-    """
-    Free-form map from a stop tag to the maximum number of separate visit groups a resource may make to stops carrying that tag over one tour.
-
-    """
-
-    root: Dict[str, int]
-
-
 class Type49(str, Enum):
     """
     Discriminator identifying this constraint as `removalStrategy`.
     """
 
     removalStrategy = 'removalStrategy'
-
-
-class RemovalStrategy(RootModel[RemovalStrategyType]):
-    root: RemovalStrategyType
 
 
 class AdditionalConstraintRemovalStrategy(BaseModel):
@@ -2074,7 +2022,7 @@ class AdditionalConstraintRemovalStrategy(BaseModel):
         description='Capacity names tracked for the last-in-first-out ordering.',
         examples=[['volume', 'length']],
     )
-    removalStrategy: Optional[RemovalStrategy] = Field(None, examples=['lifo'])
+    removalStrategy: Optional[RemovalStrategyType] = Field(None, examples=['lifo'])
 
 
 class Paging(BaseModel):
@@ -2113,15 +2061,6 @@ class Paging(BaseModel):
         description='The number of items per page, set internally or by the request.',
         examples=[30],
         le=100,
-    )
-
-
-class UUIDModel(RootModel[UUID]):
-    root: UUID = Field(
-        ...,
-        description='Universally Unique Identifier.',
-        examples=['cd4ce4e3-0208-4b10-b346-25f235214e4f'],
-        pattern='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
     )
 
 
@@ -2198,13 +2137,23 @@ class AdditionalOperationDuration(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    resourceTag: RegexIdValidation = Field(
-        ..., description='Resource tag.', examples=['trailer']
+    resourceTag: str = Field(
+        ...,
+        description='Resource tag.',
+        examples=['trailer'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
-    stopTag: RegexIdValidation = Field(..., description='Stop tag.', examples=['heavy'])
-    additionalOperationDuration: Duration = Field(
+    stopTag: str = Field(
+        ...,
+        description='Stop tag.',
+        examples=['heavy'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
+    )
+    additionalOperationDuration: str = Field(
         ...,
         description="Extra duration added on top of the stop's own `operationDuration` whenever this `resourceTag`/`stopTag` pair is matched.",
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
 
 
@@ -2218,15 +2167,6 @@ class PlanId(BaseModel):
     )
 
 
-class State(RootModel[PlanState]):
-    """
-    Current optimization state of the plan (see `PlanState`). Does not carry the solution itself — once `optimized`, retrieve it separately via `GET /plans/{planId}/solution`.
-
-    """
-
-    root: PlanState
-
-
 class EnvelopedPlanReference(BaseModel):
     """
     An envelope carrying no item, only the reference of the plan the request acted on.
@@ -2235,10 +2175,18 @@ class EnvelopedPlanReference(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    agencyId: Optional[AgencyId] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
     planId: Optional[PlanId] = None
-    planVersion: Optional[PlanVersion] = Field(
-        None, description="The plan's current version: unchanged by this request."
+    planVersion: Optional[int] = Field(
+        None,
+        description="The plan's current version: unchanged by this request.",
+        examples=[42],
+        ge=1,
     )
     warnings: Optional[List[Warning]] = Field(
         None,
@@ -2254,13 +2202,18 @@ class TimedPlanState(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    planVersion: Optional[PlanVersion] = Field(
-        None, description='The version of the plan this state describes.', examples=[2]
+    planVersion: Optional[int] = Field(
+        None,
+        description='The version of the plan this state describes.',
+        examples=[2],
+        ge=1,
     )
-    timestamp: Optional[DateTime] = Field(
-        None, description='When this state was recorded.'
+    timestamp: Optional[str] = Field(
+        None,
+        description='When this state was recorded.',
+        examples=['2019-11-15T12:34:56Z'],
     )
-    state: Optional[State2] = Field(
+    state: Optional[PlanState] = Field(
         None, description="The plan's state at `timestamp`."
     )
 
@@ -2274,7 +2227,12 @@ class EnvelopedTimedPlanState(BaseModel):
         extra='allow',
     )
     item: Optional[TimedPlanState] = Field(None, description='The state itself.')
-    agencyId: Optional[AgencyId] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
     planId: Optional[PlanId] = None
 
 
@@ -2286,8 +2244,11 @@ class PlanStatus(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    planVersionInSolution: Optional[PlanVersion] = Field(
-        None, description='The plan version taken into account in the current solution.'
+    planVersionInSolution: Optional[int] = Field(
+        None,
+        description='The plan version taken into account in the current solution.',
+        examples=[42],
+        ge=1,
     )
     waitingRoom: Optional[PlanStatusVersion] = Field(
         None,
@@ -2314,17 +2275,23 @@ class MaxInterStopDurationBounds(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    firstTravel: Optional[Duration] = Field(
+    firstTravel: Optional[str] = Field(
         None,
         description="Maximum duration between the resource's departure and the first stop.",
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
-    interStop: Optional[Duration] = Field(
+    interStop: Optional[str] = Field(
         None,
         description='Maximum duration between two consecutive intermediate stops (excluding the first and last travels).',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
-    lastTravel: Optional[Duration] = Field(
+    lastTravel: Optional[str] = Field(
         None,
         description="Maximum duration between the last stop and the resource's arrival.",
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
 
 
@@ -2341,25 +2308,27 @@ class SingleStop(BaseModel):
         ...,
         description='Always set this explicitly (`"type": "single"`), even though it defaults and a bare stop object is accepted as-is: a discriminated-union validator re-parsing your own payload (for example a typed SDK confirming it round-trips) needs the tag present in the data itself to pick the right variant, and rejects an object missing it even when the field has a documented default.\n',
     )
-    id: RegexIdValidation = Field(
+    id: str = Field(
         ...,
         description='Single stop ids must be unique within a plan.',
         examples=['stop1'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
-    properties: Optional[Properties] = None
+    properties: Optional[Dict[str, str]] = None
     tags: Optional[List[RegexIdValidation]] = Field(
         None,
         description='prefix:suffix best practice, not forced.',
         examples=[['access:parking33', 'capa:bat22', 'setup:france']],
     )
     position: Position
-    kind: Optional[Kind] = None
-    operationDuration: Optional[Duration] = Field(
+    kind: Optional[StopKind] = None
+    operationDuration: Optional[str] = Field(
         None,
         description='Time spent at the stop, in ISO 8601 duration format.\n\n> **Modelling pitfall.** No built-in formula computes this. It is a plain duration computed upstream from business data, for example a fixed per-stop time plus a variable component for quantity delivered.\n',
         examples=['PT10M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
-    capacities: Optional[Capacities] = Field(
+    capacities: Optional[Dict[str, float]] = Field(
         None,
         description='Capacities consumed or released at this stop. See the `Capacities` schema.',
     )
@@ -2390,10 +2359,11 @@ class AlternativesStop(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    id: RegexIdValidation = Field(
+    id: str = Field(
         ...,
         description='Alternatives-group ids must be unique within a plan.',
         examples=['altStop1'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
     type: Literal['alternatives'] = Field(
         ...,
@@ -2413,46 +2383,24 @@ class SetupDuration(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    fromStopTag: RegexIdValidation = Field(
+    fromStopTag: str = Field(
         ...,
         description='Tag of the stop the resource is leaving.',
         examples=['setup:france'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
-    toStopTag: RegexIdValidation = Field(
+    toStopTag: str = Field(
         ...,
         description='Tag of the stop the resource is arriving at next.',
         examples=['setup:belgium'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
-    setupDuration: Duration = Field(
+    setupDuration: str = Field(
         ...,
         description='Changeover duration added between the two stops, in ISO 8601 duration format.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
-
-
-class Direction(RootModel[OptimizationDirection]):
-    """
-    Whether the engine should minimize or maximize the resulting cost.
-    """
-
-    root: OptimizationDirection
-
-
-class Break(
-    RootModel[
-        Union[TimeWindowBreak, TravelDurationSlidingBreak, WorkingDurationSlidingBreak]
-    ]
-):
-    root: Union[
-        TimeWindowBreak, TravelDurationSlidingBreak, WorkingDurationSlidingBreak
-    ] = Field(
-        ...,
-        description="A resource's `breaks` array mixes any of the three types below; they are not mutually exclusive, and a break counts as working time unless its type says otherwise.\n\nA `timeWindowBreak` is hard: the engine drops stops rather than skip the break. Currently, a tour that ends before the window opens has no break waypoint. A tour that keeps running past the end of the window gets a break waypoint. A tour that ends inside the window gets none when enough of the window remains after the tour ends, and the engine drops stops when too little remains. It isn't confirmed whether a wait at a stop counts as the break. A sliding break is not scheduled when the tour is shorter than `maxInterBreakDuration`.\n\n> **Modelling pitfall.** The two sliding types (`workingDurationSlidingBreak`, `travelDurationSlidingBreak`) count the same physical break toward both their clocks. Define both together for a shift with a labor-time rule and a driving-time rule, rather than assuming one covers the other.\n\n> **Default.** For a resource whose `workingTimeWindow` spans more than one calendar day, `breaks` is where daily rest has to be encoded; a wide window does not produce it on its own.\n",
-        discriminator='type',
-    )
-
-
-class ShippedHazardousGoodModel(RootModel[ShippedHazardousGood]):
-    root: ShippedHazardousGood
 
 
 class VehicleProfileTruck(BaseModel):
@@ -2507,13 +2455,15 @@ class VehicleProfileTruck(BaseModel):
     avoidUTurns: Optional[bool] = Field(
         None, description='Excludes U-turns from computed routes.'
     )
-    shippedHazardousGoods: Optional[List[ShippedHazardousGoodModel]] = Field(
+    shippedHazardousGoods: Optional[List[ShippedHazardousGood]] = Field(
         None,
         description='Categories of hazardous goods carried, used to respect roads restricted to those categories.',
         examples=[['explosive', 'gas', 'flammable']],
     )
-    excludedCountries: Optional[CountryCodes] = Field(
-        None, description='Countries to route around entirely.'
+    excludedCountries: Optional[List[str]] = Field(
+        None,
+        description='Countries to route around entirely.',
+        examples=[['Switzerland', 'BE', 'ITA']],
     )
     height: Optional[int] = Field(
         None,
@@ -2599,14 +2549,6 @@ class Cost(BaseModel):
     )
 
 
-class Assignments(
-    RootModel[Union[AssignmentStop, AssignmentBegin, AssignmentBreak, AssignmentEnd]]
-):
-    root: Union[AssignmentStop, AssignmentBegin, AssignmentBreak, AssignmentEnd] = (
-        Field(..., discriminator='type')
-    )
-
-
 class StateModel(BaseModel):
     """
     Resource's current mode and, when re-optimizing a plan whose resources are already underway, the stops, breaks, begin or end already committed to that resource.
@@ -2616,8 +2558,10 @@ class StateModel(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    mode: Optional[Mode] = None
-    assignments: Optional[List[Assignments]] = Field(
+    mode: Optional[ResourceMode] = None
+    assignments: Optional[
+        List[Annotated[Union[AssignmentStop, AssignmentBegin, AssignmentBreak, AssignmentEnd], Field(discriminator='type')]]
+    ] = Field(
         None,
         description="Waypoints to pin onto this resource's tour before the engine plans the rest of it, ordered as they occur on the tour.\n\n> **When to use.** For re-optimizing a plan mid-execution: fix the waypoints a resource has already completed or is already committed to, then let the engine re-plan everything that comes after.\n",
     )
@@ -2631,9 +2575,11 @@ class EnvelopedErrors(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    agencyId: Optional[AgencyId] = Field(
+    agencyId: Optional[str] = Field(
         None,
         description="The agency the failed action was scoped to.\n\n> **Default.** Absent when the action isn't tied to any agency at all — for example a `401` `NOT_AUTHENTICATED` response, returned before any agency could be resolved from the token.\n",
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
     )
     planId: Optional[PlanId] = Field(
         None,
@@ -2664,44 +2610,19 @@ class EnvelopedSolutionObjectives(BaseModel):
     items: Optional[List[SolutionObjective]] = Field(
         None, description='Achieved objective values.'
     )
-    agencyId: Optional[AgencyId] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
     planId: Optional[PlanId] = None
-    planVersion: Optional[PlanVersion] = None
+    planVersion: Optional[int] = Field(
+        None, description='The plan version.', examples=[42], ge=1
+    )
     warnings: Optional[List[Warning]] = Field(
         None,
         description='Amendments applied, and probable mistakes found, while processing this request, if any.',
-    )
-
-
-class WaypointViolation(
-    RootModel[
-        Union[
-            BeginViolation,
-            EndViolation,
-            SkillsViolation,
-            ForbiddenAssignmentViolation,
-            AuthorizedTimeWindowViolation,
-            CapacityViolation,
-            AtLeastOneValidCapacityViolation,
-            MaxInterStopDistanceInKmViolation,
-            MaxInterStopDurationViolation,
-        ]
-    ]
-):
-    root: Union[
-        BeginViolation,
-        EndViolation,
-        SkillsViolation,
-        ForbiddenAssignmentViolation,
-        AuthorizedTimeWindowViolation,
-        CapacityViolation,
-        AtLeastOneValidCapacityViolation,
-        MaxInterStopDistanceInKmViolation,
-        MaxInterStopDurationViolation,
-    ] = Field(
-        ...,
-        description='The subset of `TourViolation` kinds that attach to one specific waypoint rather than to the tour as a whole. Branch on `type` to read the fields specific to that violation kind, or handle an unrecognized `type` generically without inspecting its other fields.\n',
-        discriminator='type',
     )
 
 
@@ -2763,13 +2684,27 @@ class WayPointBegin(BaseModel):
     position: Position = Field(
         ..., description='Geographic position the resource departs from.'
     )
-    status: Optional[Status4] = Field(None, examples=['fixed'])
-    departureTime: Optional[DateTime] = Field(
-        None, description='Time the resource departs.'
+    status: Optional[WayPointStatus] = Field(None, examples=['fixed'])
+    departureTime: Optional[str] = Field(
+        None,
+        description='Time the resource departs.',
+        examples=['2019-11-15T12:34:56Z'],
     )
-    violations: Optional[List[WaypointViolation]] = Field(
-        None, description='Constraint violations found at this waypoint.'
-    )
+    violations: Optional[
+        List[
+            Annotated[Union[
+                BeginViolation,
+                EndViolation,
+                SkillsViolation,
+                ForbiddenAssignmentViolation,
+                AuthorizedTimeWindowViolation,
+                CapacityViolation,
+                AtLeastOneValidCapacityViolation,
+                MaxInterStopDistanceInKmViolation,
+                MaxInterStopDurationViolation,
+            ], Field(discriminator='type')]
+        ]
+    ] = Field(None, description='Constraint violations found at this waypoint.')
     fromPrevious: Optional[FromPrevious] = None
 
 
@@ -2784,37 +2719,61 @@ class WayPointStop(BaseModel):
     type: Literal['stop'] = Field(
         ..., description='Discriminator identifying this waypoint as a stop.'
     )
-    stopId: Optional[RegexIdValidation] = Field(
-        None, description='Id of the visited stop.', examples=['stop1']
+    stopId: Optional[str] = Field(
+        None,
+        description='Id of the visited stop.',
+        examples=['stop1'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
     position: Position = Field(..., description='Geographic position of the stop.')
-    status: Optional[Status4] = Field(None, examples=['optimized'])
-    stopProperties: Optional[Properties] = Field(
+    status: Optional[WayPointStatus] = Field(None, examples=['optimized'])
+    stopProperties: Optional[Dict[str, str]] = Field(
         None, description='Free-form properties carried over from the stop itself.'
     )
-    orderProperties: Optional[Properties] = Field(
+    orderProperties: Optional[Dict[str, str]] = Field(
         None,
         description='Free-form properties carried over from the order this stop belongs to.',
     )
-    filledCapacitiesAfterStop: Optional[Capacities] = Field(
+    filledCapacitiesAfterStop: Optional[Dict[str, float]] = Field(
         None,
         description='Capacities loaded on the resource immediately after this stop.',
     )
-    delay: Optional[Duration] = Field(
-        None, description="Delay related to the stop's preferred time windows."
+    delay: Optional[str] = Field(
+        None,
+        description="Delay related to the stop's preferred time windows.",
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
-    arrivalTime: Optional[DateTime] = Field(
-        None, description='Time the resource reaches the stop.'
+    arrivalTime: Optional[str] = Field(
+        None,
+        description='Time the resource reaches the stop.',
+        examples=['2019-11-15T12:34:56Z'],
     )
-    beginTime: Optional[DateTime] = Field(
-        None, description='Time the resource starts serving the stop.'
+    beginTime: Optional[str] = Field(
+        None,
+        description='Time the resource starts serving the stop.',
+        examples=['2019-11-15T12:34:56Z'],
     )
-    departureTime: Optional[DateTime] = Field(
-        None, description='Time the resource leaves the stop.'
+    departureTime: Optional[str] = Field(
+        None,
+        description='Time the resource leaves the stop.',
+        examples=['2019-11-15T12:34:56Z'],
     )
-    violations: Optional[List[WaypointViolation]] = Field(
-        None, description='Constraint violations found at this waypoint.'
-    )
+    violations: Optional[
+        List[
+            Annotated[Union[
+                BeginViolation,
+                EndViolation,
+                SkillsViolation,
+                ForbiddenAssignmentViolation,
+                AuthorizedTimeWindowViolation,
+                CapacityViolation,
+                AtLeastOneValidCapacityViolation,
+                MaxInterStopDistanceInKmViolation,
+                MaxInterStopDurationViolation,
+            ], Field(discriminator='type')]
+        ]
+    ] = Field(None, description='Constraint violations found at this waypoint.')
     fromPrevious: Optional[FromPrevious] = None
     stopKind: Optional[StopKind] = Field(
         StopKind.delivery,
@@ -2833,15 +2792,30 @@ class WayPointBreak(BaseModel):
     type: Literal['break'] = Field(
         ..., description='Discriminator identifying this waypoint as a break.'
     )
-    status: Optional[Status4] = Field(None, examples=['optimized'])
-    arrivalTime: Optional[DateTime] = Field(
+    status: Optional[WayPointStatus] = Field(None, examples=['optimized'])
+    arrivalTime: Optional[str] = Field(
         None,
         description='Time the break waypoint starts. It can be earlier than the break itself, for example when the waypoint includes a wait.',
+        examples=['2019-11-15T12:34:56Z'],
     )
-    departureTime: Optional[DateTime] = Field(None, description='Time the break ends.')
-    violations: Optional[List[WaypointViolation]] = Field(
-        None, description='Constraint violations found at this waypoint.'
+    departureTime: Optional[str] = Field(
+        None, description='Time the break ends.', examples=['2019-11-15T12:34:56Z']
     )
+    violations: Optional[
+        List[
+            Annotated[Union[
+                BeginViolation,
+                EndViolation,
+                SkillsViolation,
+                ForbiddenAssignmentViolation,
+                AuthorizedTimeWindowViolation,
+                CapacityViolation,
+                AtLeastOneValidCapacityViolation,
+                MaxInterStopDistanceInKmViolation,
+                MaxInterStopDurationViolation,
+            ], Field(discriminator='type')]
+        ]
+    ] = Field(None, description='Constraint violations found at this waypoint.')
     fromPrevious: Optional[FromPrevious] = None
 
 
@@ -2859,13 +2833,27 @@ class WayPointEnd(BaseModel):
     position: Position = Field(
         ..., description='Geographic position the resource arrives at.'
     )
-    status: Optional[Status4] = Field(None, examples=['optimized'])
-    arrivalTime: Optional[DateTime] = Field(
-        None, description='Time the resource arrives.'
+    status: Optional[WayPointStatus] = Field(None, examples=['optimized'])
+    arrivalTime: Optional[str] = Field(
+        None,
+        description='Time the resource arrives.',
+        examples=['2019-11-15T12:34:56Z'],
     )
-    violations: Optional[List[WaypointViolation]] = Field(
-        None, description='Constraint violations found at this waypoint.'
-    )
+    violations: Optional[
+        List[
+            Annotated[Union[
+                BeginViolation,
+                EndViolation,
+                SkillsViolation,
+                ForbiddenAssignmentViolation,
+                AuthorizedTimeWindowViolation,
+                CapacityViolation,
+                AtLeastOneValidCapacityViolation,
+                MaxInterStopDistanceInKmViolation,
+                MaxInterStopDurationViolation,
+            ], Field(discriminator='type')]
+        ]
+    ] = Field(None, description='Constraint violations found at this waypoint.')
     fromPrevious: Optional[FromPrevious] = None
 
 
@@ -2894,7 +2882,7 @@ class AdditionalConstraintMaxStopTagGroups(BaseModel):
         description='Resource tags this constraint applies to.',
         examples=[['subcontractorA', 'subcontractorB']],
     )
-    maxGroupsByStopTag: MaxGroupsByStopTag = Field(
+    maxGroupsByStopTag: Dict[str, int] = Field(
         ..., description='Maximum number of separate visit groups allowed, by stop tag.'
     )
 
@@ -2907,10 +2895,18 @@ class PlanWebhook(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    id: Optional[UUIDModel] = Field(
-        None, description='Id of this webhook registration.'
+    id: Optional[UUID] = Field(
+        None,
+        description='Id of this webhook registration.',
+        examples=['cd4ce4e3-0208-4b10-b346-25f235214e4f'],
+        pattern='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
     )
-    agencyId: Optional[AgencyId] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
     planId: Optional[PlanId] = None
     url: Optional[AnyUrl] = Field(
         None,
@@ -2934,14 +2930,20 @@ class PlanWebhook(BaseModel):
         description='Specifies whether the webhook is active or not.',
         examples=[False],
     )
-    createdAt: Optional[DateTime] = Field(
-        None, description="The webhook's creation date."
+    createdAt: Optional[str] = Field(
+        None,
+        description="The webhook's creation date.",
+        examples=['2019-11-15T12:34:56Z'],
     )
-    updatedAt: Optional[DateTime] = Field(
-        None, description="The webhook's last update date."
+    updatedAt: Optional[str] = Field(
+        None,
+        description="The webhook's last update date.",
+        examples=['2019-11-15T12:34:56Z'],
     )
-    expiresAt: Optional[DateTime] = Field(
-        None, description="The webhook's expiration date."
+    expiresAt: Optional[str] = Field(
+        None,
+        description="The webhook's expiration date.",
+        examples=['2019-11-15T12:34:56Z'],
     )
 
 
@@ -2956,7 +2958,12 @@ class EnvelopedPlanWebhook(BaseModel):
     item: Optional[PlanWebhook] = Field(
         None, description='The webhook registration itself.'
     )
-    agencyId: Optional[AgencyId] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
     planId: Optional[PlanId] = None
 
 
@@ -2971,7 +2978,12 @@ class EnvelopedPlanWebhooks(BaseModel):
     items: Optional[List[PlanWebhook]] = Field(
         None, description='Webhooks registered on this plan.'
     )
-    agencyId: Optional[AgencyId] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
     planId: Optional[PlanId] = None
 
 
@@ -2983,19 +2995,31 @@ class PlanWebhookResult(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    webhookId: Optional[UUIDModel] = Field(
-        None, description='Id of the webhook this delivery attempt belongs to.'
+    webhookId: Optional[UUID] = Field(
+        None,
+        description='Id of the webhook this delivery attempt belongs to.',
+        examples=['cd4ce4e3-0208-4b10-b346-25f235214e4f'],
+        pattern='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
     )
-    agencyId: Optional[AgencyId] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
     planId: Optional[PlanId] = None
-    planVersion: Optional[PlanVersion] = None
+    planVersion: Optional[int] = Field(
+        None, description='The plan version.', examples=[42], ge=1
+    )
     statusCode: Optional[int] = Field(
         None,
         description="The HTTP status code from the webhook's response.",
         examples=[200],
     )
-    timestamp: Optional[DateTime] = Field(
-        None, description='When this delivery attempt was made.'
+    timestamp: Optional[str] = Field(
+        None,
+        description='When this delivery attempt was made.',
+        examples=['2019-11-15T12:34:56Z'],
     )
     inputSize: Optional[float] = Field(
         None, description="The webhook's input payload size in KB.", examples=[2.3]
@@ -3022,7 +3046,12 @@ class EnvelopedPlanWebhookResults(BaseModel):
     items: Optional[List[PlanWebhookResult]] = Field(
         None, description="Delivery attempts for this plan's webhooks."
     )
-    agencyId: Optional[AgencyId] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
     planId: Optional[PlanId] = None
 
 
@@ -3035,15 +3064,22 @@ class PlanLight(BaseModel):
         extra='allow',
     )
     id: Optional[PlanId] = None
-    agencyId: Optional[AgencyId] = None
-    version: Optional[PlanVersion] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
+    version: Optional[int] = Field(
+        None, description='The plan version.', examples=[42], ge=1
+    )
     running: Optional[bool] = Field(None, description='To know if the plan is running.')
     status: Optional[PlanStatus] = None
-    state: Optional[State] = Field(
+    state: Optional[PlanState] = Field(
         None,
         description='Current optimization state of the plan (see `PlanState`). Does not carry the solution itself — once `optimized`, retrieve it separately via `GET /plans/{planId}/solution`.\n',
     )
-    properties: Optional[Properties] = None
+    properties: Optional[Dict[str, str]] = None
     nbResources: Optional[int] = Field(
         None,
         description='Number of entries in `resources`, computed by the server.',
@@ -3052,26 +3088,30 @@ class PlanLight(BaseModel):
     nbOrders: Optional[int] = Field(
         None, description='Number of entries in `orders`, computed by the server.', ge=0
     )
-    createdAt: Optional[DateTime] = Field(
-        None, description="The plan's creation datetime."
+    createdAt: Optional[str] = Field(
+        None,
+        description="The plan's creation datetime.",
+        examples=['2019-11-15T12:34:56Z'],
     )
     createdBy: Optional[str] = Field(
         None,
         description='The username of the user who created this plan.',
         examples=['jane.doe'],
     )
-    updatedAt: Optional[DateTime] = Field(
+    updatedAt: Optional[str] = Field(
         None,
         description="The plan's last update datetime: absent until the plan is updated for the first time.",
+        examples=['2019-11-15T12:34:56Z'],
     )
     updatedBy: Optional[str] = Field(
         None,
         description='The username of the user who last updated this plan: absent until the plan is updated for the first time.',
         examples=['jane.doe'],
     )
-    archivedAt: Optional[DateTime] = Field(
+    archivedAt: Optional[str] = Field(
         None,
         description="The plan's archiving datetime: if this property is present, the plan is archived.",
+        examples=['2019-11-15T12:34:56Z'],
     )
 
 
@@ -3084,7 +3124,12 @@ class EnvelopedPlansLight(BaseModel):
         extra='allow',
     )
     items: Optional[List[PlanLight]] = Field(None, description='Plans on this page.')
-    agencyId: Optional[AgencyId] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
     paging: Optional[Paging] = None
 
 
@@ -3099,12 +3144,13 @@ class Resource(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    id: RegexIdValidation = Field(
+    id: str = Field(
         ...,
         description='Resource ids must be unique within a plan.',
         examples=['resource1'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
-    properties: Optional[Properties] = None
+    properties: Optional[Dict[str, str]] = None
     state: Optional[StateModel] = None
     cost: Optional[Cost] = Field(
         None,
@@ -3154,7 +3200,7 @@ class Resource(BaseModel):
         description='Mode of transport and its travel constraints. Each type exposes different parameters; `truck` is the richest (weight, dimensions, hazardous goods, toll/tunnel/highway avoidance). See the individual `VehicleProfile*` schemas for the full parameter list of each mode.\n',
         discriminator='type',
     )
-    capacities: Optional[Capacities] = Field(
+    capacities: Optional[Dict[str, float]] = Field(
         None,
         description='Capacity ceilings available on this resource. See the `Capacities` schema.',
     )
@@ -3173,10 +3219,11 @@ class Resource(BaseModel):
             {'begin': '2026-03-17T08:00:00+01:00', 'end': '2026-03-17T18:00:00+01:00'}
         ],
     )
-    maxWorkingDuration: Optional[Duration] = Field(
+    maxWorkingDuration: Optional[str] = Field(
         None,
         description='Maximum working time (travel, service, breaks and waiting combined) inside `workingTimeWindow`, in ISO 8601 duration format.\n\n> **Modelling pitfall.** On a resource that works several days, size it for the whole trip, counting the time spent on breaks and on waiting. A cap sized for one working day rules out any tour that works on both sides of the rest. The engine then leaves unplaced the stops that need such a tour, with no error.\n',
         examples=['PT8H'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
     maxDistanceInKm: Optional[float] = Field(
         None,
@@ -3193,7 +3240,13 @@ class Resource(BaseModel):
         None,
         description='Maximum duration between two consecutive stops on a tour. Either a single duration applied uniformly to every travel of the tour, or a structured object with independent bounds per segment (`firstTravel`, `interStop`, `lastTravel`).\n\n> **Default.** Each key of the structured form is independent; an absent key means no constraint on that segment, not a constraint set to zero.\n',
     )
-    breaks: Optional[List[Break]] = Field(
+    breaks: Optional[
+        List[
+            Annotated[Union[
+                TimeWindowBreak, TravelDurationSlidingBreak, WorkingDurationSlidingBreak
+            ], Field(discriminator='type')]
+        ]
+    ] = Field(
         None,
         description="Breaks to schedule into this resource's tour; see `Break` for the three available kinds.\n\n> **Modelling pitfall.** Currently, the engine schedules a break only where the vehicle already stands, never in the middle of a drive. A `timeWindowBreak` can fall at the start of the tour. For a `timeWindowBreak`, a drive that covers the whole time the break could take place is impossible. The engine then leaves the stops that need that drive unplaced. It returns no error and no violation. A sliding break falls only after a stop, never at the start of the tour. For a `travelDurationSlidingBreak` or a `workingDurationSlidingBreak`, the engine allows a drive longer than `maxInterBreakDuration`. When the limit is already passed on arrival at a stop, it adds the missed breaks at that stop, if the tour goes on after it. Nothing catches up the last drive. The engine marks the tour valid and reports no violation. To keep a long drive within the rule, give the route a stop where the break can fall, then check the gaps in the solution. See [Where a break can fall](https://developers.kardinal.ai/guides/breaks#where-a-break-can-fall).\n",
     )
@@ -3206,7 +3259,7 @@ class Resource(BaseModel):
         description='Multiplier applied to every network-computed travel time for this resource, to account for a systematically slower or faster driver.',
         examples=[1.05],
     )
-    emptyThresholdByCapacity: Optional[Capacities] = Field(
+    emptyThresholdByCapacity: Optional[Dict[str, float]] = Field(
         None,
         description='Thresholds for capacities below which a resource is considered "empty" for empty distance calculation. A resource is "empty" (kilometres travelled count as empty distance) when all capacities are at or below their threshold.\n',
         examples=[{'weight': 100.0, 'volume': 50.0}],
@@ -3214,14 +3267,6 @@ class Resource(BaseModel):
     avoidEarlyLoadings: Optional[List[AvoidEarlyLoading]] = Field(
         None,
         description='Early loading declarations for this resource. Each entry names a stop tag for the `minimizeEarlyLoadings` objective, and optionally the capacities to track. A plan with declarations must also list that objective in `objectives`. Otherwise, the plan is refused with a `400`. See `AvoidEarlyLoading`.',
-    )
-
-
-class Stop(RootModel[Union[SingleStop, AlternativesStop]]):
-    root: Union[SingleStop, AlternativesStop] = Field(
-        ...,
-        description='Either a single stop or a group of alternative stops, of which the engine picks at most one.',
-        discriminator='type',
     )
 
 
@@ -3234,10 +3279,13 @@ class Order(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    id: RegexIdValidation = Field(
-        ..., description='Order ids must be unique within a plan.', examples=['order1']
+    id: str = Field(
+        ...,
+        description='Order ids must be unique within a plan.',
+        examples=['order1'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
-    properties: Optional[Properties] = None
+    properties: Optional[Dict[str, str]] = None
     priority: Optional[int] = Field(
         0,
         description="Relative importance of the order; lower is more important, and the value can be negative.\n\n> **When to use.** Lower an order's priority, or mark it `optional`, to make an acceptable-to-drop trade-off explicit rather than an unplanned side effect once the fleet is under pressure from higher-priority stops.\n\n> **Modelling pitfall.** Priority levels are strict tiers, not weights: one more planned stop of a more important level outweighs any number of stops of a less important level.\n",
@@ -3252,7 +3300,7 @@ class Order(BaseModel):
         description='Hard requirement: a resource must have every listed skill to be assignable to this order.\n',
         examples=[['forklift', 'truck']],
     )
-    stops: List[Stop] = Field(
+    stops: List[Annotated[Union[SingleStop, AlternativesStop], Field(discriminator='type')]] = Field(
         ...,
         description='The stops making up this order; see `Stop` for a single fixed stop vs. a group of alternatives.\n\n> **Default.** Capped at 3,000 stops per plan across all orders combined — see [Limits and quotas](https://developers.kardinal.ai/reference/limits-and-quotas).\n',
     )
@@ -3260,19 +3308,12 @@ class Order(BaseModel):
         None,
         description="The order's stops must be visited consecutively, with nothing from another order in between. Mutually exclusive with `maxStopSpan`.\n\n> **Default.** An order without `successiveStops` can have at most 4 stops; see [Limits and quotas](https://developers.kardinal.ai/reference/limits-and-quotas).\n",
     )
-    maxStopSpan: Optional[Duration] = Field(
+    maxStopSpan: Optional[str] = Field(
         None,
         description="Maximum time allowed to elapse between the order's stops (for example between a pickup and its delivery), without forcing them to be consecutive.\n\nThe span runs from the end of service at the order's first stop to the start of service at its last stop. Waiting time counts.\n",
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
-
-
-class CostsByResourceTag(RootModel[Dict[str, Cost]]):
-    """
-    Cost structure mapped by resource tag. Unlike `emptyThresholdByCapacityByResourceTag` or `avoidEarlyLoadingsByResourceTag`, the wildcard tag "*" is not supported here — use a named resource tag for every entry.
-
-    """
-
-    root: Dict[str, Cost]
 
 
 class CustomObjective(BaseModel):
@@ -3292,21 +3333,13 @@ class CustomObjective(BaseModel):
         description='Name identifying this custom objective. Must not collide with a built-in `ObjectivesEnum` value.',
         examples=['minimizeFuelCost'],
     )
-    direction: Direction = Field(
+    direction: OptimizationDirection = Field(
         ...,
         description='Whether the engine should minimize or maximize the resulting cost.',
     )
-    costsByResourceTag: CostsByResourceTag = Field(
+    costsByResourceTag: Dict[str, Cost] = Field(
         ...,
         description='Cost expression the engine optimizes, evaluated per resource tag.',
-    )
-
-
-class WayPoints(
-    RootModel[Union[WayPointBegin, WayPointStop, WayPointBreak, WayPointEnd]]
-):
-    root: Union[WayPointBegin, WayPointStop, WayPointBreak, WayPointEnd] = Field(
-        ..., discriminator='type'
     )
 
 
@@ -3333,35 +3366,9 @@ class GlobalConstraintMaxCumulatedCost(BaseModel):
         description="The constraint's maximum allowed cumulated cost, in the same unit as the costs in `costsByResourceTag`. It is required and has no default: a constraint without it is rejected with a `400` `INVALID_VALUE` error. This is a hard limit: the engine leaves stops unplanned rather than exceed it, so a mandatory stop can end up in `unaffectedStopIds`. The exception is locked tours (`state.mode: fixed`) that already cost more than `maximum`: the engine keeps the locked stops, goes over `maximum`, and reports it in `globalViolations`.\n",
         examples=[1000],
     )
-    costsByResourceTag: CostsByResourceTag = Field(
+    costsByResourceTag: Dict[str, Cost] = Field(
         ...,
         description='The cost counted towards `maximum` for each resource that carries the tag, by resource tag.\n\n> **Modelling pitfall.** A tag that no resource of the plan carries, for example one with a typing error, counts nothing. The API accepts the plan, and returns a warning for that tag in the `warnings` of its response.\n',
-    )
-
-
-class PlanObjectives(
-    RootModel[
-        List[Union[ObjectivesEnum, MaximizePrecedencesObjective, CustomObjective]]
-    ]
-):
-    """
-    Ordered list of objectives the engine pursues in strict lexicographic priority: it first searches for the best possible value of the first objective, then, among solutions tied on that value, optimizes the second, and so on down the list. A tie means exactly equal values, with no tolerance. Each entry is either a name from `ObjectivesEnum`, a `maximizePrecedences` object, or a `custom` object.
-
-    `maximizeMandatoryStops`, `maximizeOptionalStops`, and `minimizeResources` are split into one objective per `priority` value present in the plan, kept at the position of the original objective: stops are maximized from the most important level (lowest number) down, resources are minimized from the least important level (highest number) up.
-
-    The list is used as given. The default list applies only when `objectives` is omitted or empty. Nothing is added to a list you set. Each entry may appear only once. A list with two entries of the same name is refused with a `400` `ID_NOT_UNIQUE` on `plan.objectives`. This rule also covers two `maximizePrecedences` objects, and two `custom` objects that share a `name`.
-
-    > **When to use.** Reorder the list to change which objective the engine favours when two cannot both be improved at once, for example moving `minimizeCosts` ahead of `minimizeDistance` when cost matters more than raw kilometres for this fleet.
-
-    > **Modelling pitfall.** Because priority is lexicographic rather than weighted, reordering the list can change the chosen solution even when every objective's value looks comparable; moving an objective earlier makes the engine trade off later objectives to protect it, not merely break ties differently. A list without `maximizeMandatoryStops` is accepted, but it may plan no stop at all: with `["minimizeDistance"]` alone, every stop stays unplanned.
-
-    """
-
-    root: List[Union[ObjectivesEnum, MaximizePrecedencesObjective, CustomObjective]] = (
-        Field(
-            ...,
-            description='Ordered list of objectives the engine pursues in strict lexicographic priority: it first searches for the best possible value of the first objective, then, among solutions tied on that value, optimizes the second, and so on down the list. A tie means exactly equal values, with no tolerance. Each entry is either a name from `ObjectivesEnum`, a `maximizePrecedences` object, or a `custom` object.\n\n`maximizeMandatoryStops`, `maximizeOptionalStops`, and `minimizeResources` are split into one objective per `priority` value present in the plan, kept at the position of the original objective: stops are maximized from the most important level (lowest number) down, resources are minimized from the least important level (highest number) up.\n\nThe list is used as given. The default list applies only when `objectives` is omitted or empty. Nothing is added to a list you set. Each entry may appear only once. A list with two entries of the same name is refused with a `400` `ID_NOT_UNIQUE` on `plan.objectives`. This rule also covers two `maximizePrecedences` objects, and two `custom` objects that share a `name`.\n\n> **When to use.** Reorder the list to change which objective the engine favours when two cannot both be improved at once, for example moving `minimizeCosts` ahead of `minimizeDistance` when cost matters more than raw kilometres for this fleet.\n\n> **Modelling pitfall.** Because priority is lexicographic rather than weighted, reordering the list can change the chosen solution even when every objective\'s value looks comparable; moving an objective earlier makes the engine trade off later objectives to protect it, not merely break ties differently. A list without `maximizeMandatoryStops` is accepted, but it may plan no stop at all: with `["minimizeDistance"]` alone, every stop stays unplanned.\n',
-        )
     )
 
 
@@ -3378,15 +3385,22 @@ class Plan(BaseModel):
         extra='allow',
     )
     id: Optional[PlanId] = None
-    agencyId: Optional[AgencyId] = None
-    version: Optional[PlanVersion] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
+    version: Optional[int] = Field(
+        None, description='The plan version.', examples=[42], ge=1
+    )
     running: Optional[bool] = Field(None, description='To know if the plan is running.')
     status: Optional[PlanStatus] = None
-    state: Optional[State] = Field(
+    state: Optional[PlanState] = Field(
         None,
         description='Current optimization state of the plan (see `PlanState`). Does not carry the solution itself — once `optimized`, retrieve it separately via `GET /plans/{planId}/solution`.\n',
     )
-    properties: Optional[Properties] = None
+    properties: Optional[Dict[str, str]] = None
     resources: List[Resource] = Field(
         ...,
         description="Resources (vehicles, drivers, or vehicle-and-driver pairs) available to serve this plan's orders.\n\n> **Default.** Capped at 250 entries per plan — see [Limits and quotas](https://developers.kardinal.ai/reference/limits-and-quotas).\n",
@@ -3423,7 +3437,19 @@ class Plan(BaseModel):
             }
         ],
     )
-    additionalConstraints: Optional[List[AdditionalConstraints]] = Field(
+    additionalConstraints: Optional[
+        List[
+            Annotated[Union[
+                AdditionalConstraintAtLeastOneValidCapacity,
+                AdditionalConstraintForbiddenAssignment,
+                AdditionalConstraintIncompatibleStopTags,
+                AdditionalConstraintAtLeastOneConstraint,
+                AdditionalConstraintCapacities,
+                AdditionalConstraintMaxStopTagGroups,
+                AdditionalConstraintRemovalStrategy,
+            ], Field(discriminator='type')]
+        ]
+    ] = Field(
         None,
         description="Extra constraints layered on top of resources' and orders' own fields, such as forbidden assignments or capacity ceilings shared across a group of stops.",
     )
@@ -3445,39 +3471,47 @@ class Plan(BaseModel):
         None,
         description='Sequence-dependent changeover times to add whenever a resource travels directly between two stops carrying a matching pair of tags.',
     )
-    objectives: Optional[PlanObjectives] = Field(
+    objectives: Optional[
+        List[Union[ObjectivesEnum, MaximizePrecedencesObjective, CustomObjective]]
+    ] = Field(
         None,
         description='Objectives the engine optimizes for this plan; see `PlanObjectives` for how priority order drives trade-offs.',
     )
-    maxOptimizationDuration: Optional[Duration] = Field(
+    maxOptimizationDuration: Optional[str] = Field(
         None,
         description="Maximum time the engine is allowed to search, in ISO 8601 duration format. The engine stops early on its own once it stops finding improvements, so an overly generous value costs only a longer worst case, never a worse solution.\n\n> **Default.** If omitted, 5 seconds for the sandbox agency and 15 minutes for the production agency. A value exceeding the agency's maximum (5 seconds for the sandbox, 6 hours for production by default) is clamped to it, with a warning in the response; see [Limits and quotas](https://developers.kardinal.ai/reference/limits-and-quotas).\n\n> **Modelling pitfall.** A good solution typically takes about `PT10S` for 1 resource and 15 stops, `PT2M` for 5 resources and 100 stops, `PT10M` for 30 resources and 800 stops, and `PT30M` for 45 resources and 3,000 stops. These values are indicative, not a guarantee: a plan can converge faster or slower depending on its constraints, and past about 800 stops the 15-minute production default is too short. Size this value against your own data (see [Handling large volumes](https://developers.kardinal.ai/guides/handling-large-volumes#sizing-maxoptimizationduration-for-a-large-problem)).\n",
         examples=['PT1H'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
-    tz: Optional[TimeZone] = Field(
+    tz: Optional[str] = Field(
         None,
         description="Time zone this plan's resources and stops are scheduled in. Local datetimes in the plan are read in it, and the API writes plan and solution datetimes back in its offset; see [Dates and time zones](https://developers.kardinal.ai/reference/data-model#dates-and-time-zones).",
+        examples=['Europe/Paris'],
     )
-    createdAt: Optional[DateTime] = Field(
-        None, description="The plan's creation datetime."
+    createdAt: Optional[str] = Field(
+        None,
+        description="The plan's creation datetime.",
+        examples=['2019-11-15T12:34:56Z'],
     )
     createdBy: Optional[str] = Field(
         None,
         description='The username of the user who created this plan.',
         examples=['jane.doe'],
     )
-    updatedAt: Optional[DateTime] = Field(
+    updatedAt: Optional[str] = Field(
         None,
         description="The plan's last update datetime: absent until the plan is updated for the first time.",
+        examples=['2019-11-15T12:34:56Z'],
     )
     updatedBy: Optional[str] = Field(
         None,
         description='The username of the user who last updated this plan: absent until the plan is updated for the first time.',
         examples=['jane.doe'],
     )
-    archivedAt: Optional[DateTime] = Field(
+    archivedAt: Optional[str] = Field(
         None,
         description="The plan's archiving datetime: if this property is present, the plan is archived.",
+        examples=['2019-11-15T12:34:56Z'],
     )
     lateDeparture: Optional[bool] = Field(
         False,
@@ -3487,10 +3521,14 @@ class Plan(BaseModel):
         False,
         description='Pools a capacity key across all of a resource\'s assigned stops for the whole tour, instead of only within a single order.\n\n> **When to use.** For several different orders assigned to the same resource that draw down and top back up the same running balance, such as a limited stock of reusable equipment. Pair it with an `atLeastOneValidCapacity` additional constraint whenever the rule is stronger than "never exceed the ceiling at any single point".\n\n> **Default.** `false`: capacities only interact within a single order.\n',
     )
-    emptyThresholdByCapacityByResourceTag: Optional[Dict[str, Capacities]] = Field(
-        None,
-        description='Thresholds for capacities below which a resource is considered "empty" for empty distance calculation, grouped by resource tag. A resource is "empty" (kilometres travelled count as empty distance) when all capacities are at or below their threshold. The wildcard tag "*" matches all resources.\n',
-        examples=[{'heavy': {'weight': 150.0, 'volume': 75.0}, '*': {'weight': 50.0}}],
+    emptyThresholdByCapacityByResourceTag: Optional[Dict[str, Dict[str, float]]] = (
+        Field(
+            None,
+            description='Thresholds for capacities below which a resource is considered "empty" for empty distance calculation, grouped by resource tag. A resource is "empty" (kilometres travelled count as empty distance) when all capacities are at or below their threshold. The wildcard tag "*" matches all resources.\n',
+            examples=[
+                {'heavy': {'weight': 150.0, 'volume': 75.0}, '*': {'weight': 50.0}}
+            ],
+        )
     )
     avoidEarlyLoadingsByResourceTag: Optional[Dict[str, List[AvoidEarlyLoading]]] = (
         Field(
@@ -3527,9 +3565,16 @@ class EnvelopedPlan(BaseModel):
         extra='allow',
     )
     item: Optional[Plan] = Field(None, description='The plan itself.')
-    agencyId: Optional[AgencyId] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
     planId: Optional[PlanId] = None
-    planVersion: Optional[PlanVersion] = None
+    planVersion: Optional[int] = Field(
+        None, description='The plan version.', examples=[42], ge=1
+    )
     warnings: Optional[List[Warning]] = Field(
         None,
         description='Amendments applied, and probable mistakes found, while processing this request, if any.',
@@ -3547,11 +3592,20 @@ class Solution(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    agencyId: Optional[AgencyId] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
     planId: Optional[PlanId] = None
-    planVersion: Optional[PlanVersion] = None
-    timestamp: Optional[DateTime] = Field(
-        None, description='When this solution was computed.'
+    planVersion: Optional[int] = Field(
+        None, description='The plan version.', examples=[42], ge=1
+    )
+    timestamp: Optional[str] = Field(
+        None,
+        description='When this solution was computed.',
+        examples=['2019-11-15T12:34:56Z'],
     )
     unaffectedStopIds: Optional[List[RegexIdValidation]] = Field(
         None,
@@ -3621,9 +3675,11 @@ class Solution(BaseModel):
     tours: Optional[List[Tour]] = Field(
         None, description='One tour per resource that was assigned at least one stop.'
     )
-    totalDelay: Optional[Duration] = Field(
+    totalDelay: Optional[str] = Field(
         None,
         description='Total delay of the solution related to the preferred time windows.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
     emptyDistanceInKm: Optional[float] = Field(
         None,
@@ -3635,7 +3691,7 @@ class Solution(BaseModel):
         description="Total CO2 emissions of the solution (sum of each tour's `CO2Emission`). Present only when at least one resource has a `CO2EmissionCalculation` (either on the resource itself or via `CO2EmissionCalculationByResourceTag` on the plan).\n",
         examples=[67890.1],
     )
-    totalTollCostsByCurrency: Optional[CostsByCurrency] = Field(
+    totalTollCostsByCurrency: Optional[Dict[str, CostRange]] = Field(
         None,
         description="Total toll costs of the solution, by currency code (sum of each tour's `tollCostsByCurrency`).",
     )
@@ -3654,9 +3710,16 @@ class EnvelopedSolution(BaseModel):
         extra='allow',
     )
     item: Optional[Solution] = Field(None, description='The solution itself.')
-    agencyId: Optional[AgencyId] = None
+    agencyId: Optional[str] = Field(
+        None,
+        description='Identifier of the Kardinal tenant/account the plan is scoped to, derived automatically from the access token used to make the request.\n\n> **Modelling pitfall.** Not a physical-depot or site partition key. A single fleet based at several physical depots is still one `Plan`; do not split it into several `Plan` objects just because resources have different `departure`/`arrival` positions.\n',
+        examples=['BLD1234567_production'],
+        pattern='^BLD[0-9]{7}_[a-zA-Z0-9-._~:@!$,]+$',
+    )
     planId: Optional[PlanId] = None
-    planVersion: Optional[PlanVersion] = None
+    planVersion: Optional[int] = Field(
+        None, description='The plan version.', examples=[42], ge=1
+    )
     warnings: Optional[List[Warning]] = Field(
         None,
         description='Amendments applied, and probable mistakes found, while processing this request, if any.',
@@ -3672,12 +3735,13 @@ class Tour(BaseModel):
     model_config = ConfigDict(
         extra='allow',
     )
-    resourceId: Optional[RegexIdValidation] = Field(
+    resourceId: Optional[str] = Field(
         None,
         description='Id of the resource this tour was built for.',
         examples=['resource1'],
+        pattern='^[a-zA-Z0-9-._~:@!$,]+$',
     )
-    mode: Optional[Mode1] = Field(
+    mode: Optional[ResourceMode] = Field(
         None, description='Resource mode this tour was computed under.'
     )
     distanceInKm: Optional[float] = Field(
@@ -3695,7 +3759,7 @@ class Tour(BaseModel):
         description="Total cost of the tour, computed from the resource's `cost` definition (or the plan's `costsByResourceTag`/`CustomObjective`).",
         examples=[1234.5],
     )
-    tollCostsByCurrency: Optional[CostsByCurrency] = Field(
+    tollCostsByCurrency: Optional[Dict[str, CostRange]] = Field(
         None, description='Toll costs of this tour, by currency code.'
     )
     CO2Emission: Optional[float] = Field(
@@ -3703,44 +3767,76 @@ class Tour(BaseModel):
         description='Total CO2 emissions of this tour, based on the given definition in `CO2EmissionCalculation`. Present only when the resource has a `CO2EmissionCalculation` (either on the resource itself or via `CO2EmissionCalculationByResourceTag` on the plan).\n',
         examples=[12345.6],
     )
-    totalDelay: Optional[Duration] = Field(
+    totalDelay: Optional[str] = Field(
         None,
         description='Total delay of the tour related to the preferred time windows.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
-    travelDuration: Optional[Duration] = Field(
+    travelDuration: Optional[str] = Field(
         None,
         description='Total time spent travelling between waypoints over the whole tour.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
-    workingDuration: Optional[Duration] = Field(
+    workingDuration: Optional[str] = Field(
         None,
         description='Whole time of the tour, from its departure to its end. It counts the drives, including the drives to and from the depot, the work at the stops, the breaks, and the waiting. The engine compares this value with the `maxWorkingDuration` of the resource.',
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
-    waitingDuration: Optional[Duration] = Field(
+    waitingDuration: Optional[str] = Field(
         None,
         description="Total time spent waiting, for example arriving before a stop's time window opens, over the whole tour.",
+        examples=['PT4M'],
+        pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
-    resourceCapacities: Optional[Capacities] = Field(
+    resourceCapacities: Optional[Dict[str, float]] = Field(
         None,
         description='List of capacities and associated quantity for which the resource has a restriction on the quantity to be carried at each stop during the tour.',
     )
-    maxFilledCapacities: Optional[Capacities] = Field(
+    maxFilledCapacities: Optional[Dict[str, float]] = Field(
         None,
         description='List of each capacity transported by the resource, as well as the maximum quantity reached for this capacity at a stop during the tour.',
     )
-    filledCapacitiesAtBegin: Optional[Capacities] = Field(
+    filledCapacitiesAtBegin: Optional[Dict[str, float]] = Field(
         None, description='Capacities loaded on the resource at the start of the tour.'
     )
-    filledCapacitiesAtEnd: Optional[Capacities] = Field(
+    filledCapacitiesAtEnd: Optional[Dict[str, float]] = Field(
         None, description='Capacities remaining on the resource at the end of the tour.'
     )
     isValid: Optional[bool] = Field(
         None,
         description="Whether the tour satisfies every hard constraint on the resource.\n\n> **Modelling pitfall.** Reflects only hard-constraint satisfaction. A tour can have `isValid: true` while still carrying soft-constraint violations, such as missed preferred time windows reflected in `totalDelay` and in the `delay` of each stop. These misses don't appear in `violations`, so read those two fields to see them.\n",
     )
-    violations: Optional[List[TourViolation]] = Field(
-        None, description='Constraint violations found on this tour.'
-    )
-    wayPoints: Optional[List[WayPoints]] = Field(
+    violations: Optional[
+        List[
+            Annotated[Union[
+                BeginViolation,
+                EndViolation,
+                SkillsViolation,
+                ForbiddenAssignmentViolation,
+                AuthorizedTimeWindowViolation,
+                CapacityViolation,
+                AtLeastOneValidCapacityViolation,
+                SuccessiveStopsViolation,
+                OrderViolation,
+                MaxStopSpanViolation,
+                WorkingTimeWindowViolation,
+                MaxWorkingDurationViolation,
+                MaxDistanceInKmViolation,
+                MaxInterStopDistanceInKmViolation,
+                MaxInterStopDurationViolation,
+                StopIncompatibilityViolation,
+                AtLeastOneConstraintViolation,
+                MaxStopTagGroupsViolation,
+                RemovalStrategyViolation,
+            ], Field(discriminator='type')]
+        ]
+    ] = Field(None, description='Constraint violations found on this tour.')
+    wayPoints: Optional[
+        List[Annotated[Union[WayPointBegin, WayPointStop, WayPointBreak, WayPointEnd], Field(discriminator='type')]]
+    ] = Field(
         None,
         description="Ordered sequence of waypoints making up the tour, from the resource's departure to its arrival.",
     )
@@ -3778,9 +3874,29 @@ class AtLeastOneConstraintViolation(BaseModel):
         description='The name of the AtLeastOneConstraint constraint the violation is linked to.',
         examples=['orConstraint1'],
     )
-    violatedConstraints: List[TourViolation] = Field(
-        ..., description='Lists of sub-constraints violations.'
-    )
+    violatedConstraints: List[
+        Annotated[Union[
+            BeginViolation,
+            EndViolation,
+            SkillsViolation,
+            ForbiddenAssignmentViolation,
+            AuthorizedTimeWindowViolation,
+            CapacityViolation,
+            AtLeastOneValidCapacityViolation,
+            SuccessiveStopsViolation,
+            OrderViolation,
+            MaxStopSpanViolation,
+            WorkingTimeWindowViolation,
+            MaxWorkingDurationViolation,
+            MaxDistanceInKmViolation,
+            MaxInterStopDistanceInKmViolation,
+            MaxInterStopDurationViolation,
+            StopIncompatibilityViolation,
+            AtLeastOneConstraintViolation,
+            MaxStopTagGroupsViolation,
+            RemovalStrategyViolation,
+        ], Field(discriminator='type')]
+    ] = Field(..., description='Lists of sub-constraints violations.')
 
 
 class AdditionalConstraintAtLeastOneConstraint(BaseModel):
@@ -3801,110 +3917,20 @@ class AdditionalConstraintAtLeastOneConstraint(BaseModel):
         description='Name identifying this constraint, referenced by any resulting `AtLeastOneConstraintViolation`.',
         examples=['orConstraint1'],
     )
-    constraints: List[Constraints] = Field(
+    constraints: List[
+        Annotated[Union[
+            AdditionalConstraintAtLeastOneValidCapacity,
+            AdditionalConstraintForbiddenAssignment,
+            AdditionalConstraintIncompatibleStopTags,
+            AdditionalConstraintAtLeastOneConstraint,
+            AdditionalConstraintCapacities,
+            AdditionalConstraintMaxStopTagGroups,
+            AdditionalConstraintRemovalStrategy,
+        ], Field(discriminator='type')]
+    ] = Field(
         ...,
         description='Constraints combined with OR logic; the tour is valid if at least one is satisfied.',
     )
-
-
-class TourViolation(
-    RootModel[
-        Union[
-            BeginViolation,
-            EndViolation,
-            SkillsViolation,
-            ForbiddenAssignmentViolation,
-            AuthorizedTimeWindowViolation,
-            CapacityViolation,
-            AtLeastOneValidCapacityViolation,
-            SuccessiveStopsViolation,
-            OrderViolation,
-            MaxStopSpanViolation,
-            WorkingTimeWindowViolation,
-            MaxWorkingDurationViolation,
-            MaxDistanceInKmViolation,
-            MaxInterStopDistanceInKmViolation,
-            MaxInterStopDurationViolation,
-            StopIncompatibilityViolation,
-            AtLeastOneConstraintViolation,
-            MaxStopTagGroupsViolation,
-            RemovalStrategyViolation,
-        ]
-    ]
-):
-    root: Union[
-        BeginViolation,
-        EndViolation,
-        SkillsViolation,
-        ForbiddenAssignmentViolation,
-        AuthorizedTimeWindowViolation,
-        CapacityViolation,
-        AtLeastOneValidCapacityViolation,
-        SuccessiveStopsViolation,
-        OrderViolation,
-        MaxStopSpanViolation,
-        WorkingTimeWindowViolation,
-        MaxWorkingDurationViolation,
-        MaxDistanceInKmViolation,
-        MaxInterStopDistanceInKmViolation,
-        MaxInterStopDurationViolation,
-        StopIncompatibilityViolation,
-        AtLeastOneConstraintViolation,
-        MaxStopTagGroupsViolation,
-        RemovalStrategyViolation,
-    ] = Field(
-        ...,
-        description='A single constraint violation found on a tour. Branch on `type` to read the fields specific to that violation kind, or handle an unrecognized `type` generically without inspecting its other fields.\n',
-        discriminator='type',
-    )
-
-
-class AdditionalConstraints(
-    RootModel[
-        Union[
-            AdditionalConstraintAtLeastOneValidCapacity,
-            AdditionalConstraintForbiddenAssignment,
-            AdditionalConstraintIncompatibleStopTags,
-            AdditionalConstraintAtLeastOneConstraint,
-            AdditionalConstraintCapacities,
-            AdditionalConstraintMaxStopTagGroups,
-            AdditionalConstraintRemovalStrategy,
-        ]
-    ]
-):
-    root: Union[
-        AdditionalConstraintAtLeastOneValidCapacity,
-        AdditionalConstraintForbiddenAssignment,
-        AdditionalConstraintIncompatibleStopTags,
-        AdditionalConstraintAtLeastOneConstraint,
-        AdditionalConstraintCapacities,
-        AdditionalConstraintMaxStopTagGroups,
-        AdditionalConstraintRemovalStrategy,
-    ] = Field(..., discriminator='type')
-
-
-class Constraints(
-    RootModel[
-        Union[
-            AdditionalConstraintAtLeastOneValidCapacity,
-            AdditionalConstraintForbiddenAssignment,
-            AdditionalConstraintIncompatibleStopTags,
-            AdditionalConstraintAtLeastOneConstraint,
-            AdditionalConstraintCapacities,
-            AdditionalConstraintMaxStopTagGroups,
-            AdditionalConstraintRemovalStrategy,
-        ]
-    ]
-):
-    root: Union[
-        AdditionalConstraintAtLeastOneValidCapacity,
-        AdditionalConstraintForbiddenAssignment,
-        AdditionalConstraintIncompatibleStopTags,
-        AdditionalConstraintAtLeastOneConstraint,
-        AdditionalConstraintCapacities,
-        AdditionalConstraintMaxStopTagGroups,
-        AdditionalConstraintRemovalStrategy,
-    ] = Field(..., discriminator='type')
 
 
 AdditionalConstraintAtLeastOneConstraint.model_rebuild()

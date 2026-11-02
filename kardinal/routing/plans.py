@@ -1,5 +1,5 @@
 """`k.routing.plans`: submit, get, update, delete, list/iter_all, start,
-stop, get_status — plus the hand-written `PlanCreate`/`Plan`/`Order` that
+stop, get_status — plus the hand-written `PlanCreate`/`Plan` that
 the single generated `Plan` schema can't provide on its own.
 """
 
@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import warnings
 
-from typing import Any, Collection, Dict, Iterator, List, Literal, Optional, Tuple, Union
+from typing import Annotated, Any, Collection, Dict, Iterator, List, Literal, Optional, Tuple, Union
 
-from pydantic import BaseModel, ConfigDict, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from .._core.errors import UnknownFieldError, UnknownFieldWarning
 from .._core.pagination import Page, iter_all as _iter_all
@@ -23,30 +23,10 @@ from ._annotations import _lenient_enums, validate_response
 from . import models
 
 
-class Order(BaseModel):
-    """Same shape as the generated `Order`, but `stops` takes a `SingleStop`
-    or `AlternativesStop` directly.
-
-    The generated `Order.stops: List[Stop]` holds each item in a `Stop`
-    RootModel, so reading a stop back takes a `.root` hop. The JSON this
-    produces is identical.
-
-    `extra="allow"` like every other model on the request path: a
-    misspelled key is kept and reported by `submit()` as one
-    `UnknownFieldError` listing every level at once, rather than raising a
-    different exception here than one level down.
-    """
-
-    model_config = ConfigDict(extra="allow")
-
-    id: models.RegexIdValidation
-    properties: Optional[models.Properties] = None
-    priority: int = 0
-    optional: Optional[bool] = None
-    requiredSkills: Optional[List[models.RegexIdValidation]] = None
-    stops: List[Union[models.SingleStop, models.AlternativesStop]]
-    successiveStops: Optional[bool] = None
-    maxStopSpan: Optional[models.Duration] = None
+# The generated `Order` already takes a `SingleStop` or `AlternativesStop`
+# directly in `stops`, so it is the one used for both requests and
+# responses. Re-exported here, where it has always been imported from.
+Order = models.Order
 
 
 class PlanCreate(BaseModel):
@@ -63,24 +43,41 @@ class PlanCreate(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    properties: Optional[models.Properties] = None
+    properties: Optional[Dict[str, str]] = None
     resources: List[models.Resource]
     orders: Optional[List[Order]] = None
     additionalOperationDurations: Optional[List[models.AdditionalOperationDuration]] = None
     operationDurationPoliciesByResourceTag: Optional[
         Dict[str, List[models.OperationDurationPolicy]]
     ] = None
-    additionalConstraints: Optional[List[models.AdditionalConstraints]] = None
+    additionalConstraints: Optional[
+        List[
+            Annotated[
+                Union[
+                    models.AdditionalConstraintAtLeastOneValidCapacity,
+                    models.AdditionalConstraintForbiddenAssignment,
+                    models.AdditionalConstraintIncompatibleStopTags,
+                    models.AdditionalConstraintAtLeastOneConstraint,
+                    models.AdditionalConstraintCapacities,
+                    models.AdditionalConstraintMaxStopTagGroups,
+                    models.AdditionalConstraintRemovalStrategy,
+                ],
+                Field(discriminator="type"),
+            ]
+        ]
+    ] = None
     globalConstraints: Optional[List[models.GlobalConstraints]] = None
     accessDurationsByStopTag: Optional[Dict[str, models.Duration]] = None
     overlappingCapacitiesByStopTag: Optional[Dict[str, int]] = None
     setupDurations: Optional[List[models.SetupDuration]] = None
-    objectives: Optional[models.PlanObjectives] = None
+    objectives: Optional[
+        List[Union[models.ObjectivesEnum, models.MaximizePrecedencesObjective, models.CustomObjective]]
+    ] = None
     maxOptimizationDuration: Optional[models.Duration] = None
-    tz: Optional[models.TimeZone] = None
+    tz: Optional[str] = None
     lateDeparture: bool = False
     sharedCapacities: bool = False
-    emptyThresholdByCapacityByResourceTag: Optional[Dict[str, models.Capacities]] = None
+    emptyThresholdByCapacityByResourceTag: Optional[Dict[str, Dict[str, float]]] = None
     avoidEarlyLoadingsByResourceTag: Optional[Dict[str, List[models.AvoidEarlyLoading]]] = None
     CO2EmissionCalculationByResourceTag: Optional[Dict[str, models.Cost]] = None
 
