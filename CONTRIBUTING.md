@@ -121,6 +121,20 @@ Like the spec check, it reads the pages with `git show` from `../mintlify`
 (or `MINTLIFY_REPO_PATH`) at `origin/main` (or `MINTLIFY_REF`), without
 checking anything out there; run `git -C <mintlify repo> fetch` first.
 
+The same script also copies the "Full payload" block of each case-study
+page (`case-studies/cold-chain-last-mile.mdx` and
+`case-studies/parcel-express.mdx`) into `tests/case_studies/`, selected by
+the title of its accordion, and `--check` covers that folder too: run it
+before each release. `tests/test_examples.py` compares
+`examples.cold_chain_plan()` and `examples.parcel_express_plan()` with these
+copies.
+
+What stays stable about those two functions is their names and their
+`PlanCreate` return type. Their content follows the published page and may
+change in any release; the TypeScript SDK follows the same rule. The
+TypeScript SDK's copy of the payloads comes from these fixtures and this
+script.
+
 ### Code generation notes
 
 - `scripts/generate_models.sh` passes `--disable-timestamp`:

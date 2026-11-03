@@ -5,6 +5,11 @@ returns a fresh object the caller can modify freely.
 
 Also the source for `kardinal routing demo` and the CI test that the README
 quickstart runs end to end.
+
+Each case-study function (`cold_chain_plan()`, `parcel_express_plan()`)
+returns the plan of its page as published. The function names and the
+`PlanCreate` return type are stable; the content follows the page and may
+change in any release.
 """
 
 from __future__ import annotations
