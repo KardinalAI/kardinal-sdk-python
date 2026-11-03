@@ -365,8 +365,9 @@ def parcel_express_plan() -> PlanCreate:
             {"parcels": 40, "weight": 600},
             breaks=[lunch_break()],
         ),
-        # Zone tags are plain labels: the bike and the walker serve the
-        # stops of their zone through their own tag.
+        # The bike's and the walker's zone tags are plain labels: no stop and
+        # no constraint refers to them, so they restrict nothing. The engine
+        # picks which stops each profile serves.
         resource(
             "bike-1",
             models.VehicleProfileBicycle(type="bicycle"),
