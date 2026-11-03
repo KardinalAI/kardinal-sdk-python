@@ -339,7 +339,7 @@ kardinal routing plans validate <file> local only, no API call, no credits
 kardinal routing solutions get <id> | objectives <id> | wait <id>
 
 kardinal routing demo                  submits the example plan, waits for it
-kardinal init                          writes .kardinal/SKILL.md, a pointer to this SDK for AI coding assistants
+kardinal init                          writes .claude/skills/kardinal/SKILL.md, a skill for Claude Code and any tool that reads Agent Skills (run it at the repository root)
 ```
 
 JSON output when stdout isn't a terminal, or with `--json`; a readable table
