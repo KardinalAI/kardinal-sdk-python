@@ -131,7 +131,7 @@ copies.
 
 What stays stable about those two functions is their names and their
 `PlanCreate` return type. Their content follows the published page and may
-change in any release; the TypeScript SDK follows the same rule. The
+change in any release; the TypeScript SDK will follow the same rule. The
 TypeScript SDK's copy of the payloads is meant to come from these fixtures
 and this script.
 
@@ -194,6 +194,10 @@ each stack:
   are plain values), a break the TypeScript SDK never had; each SDK
   follows its own numbering.
 - Pre-releases: TestPyPI here, the npm `next` dist-tag there.
+- Case-study plans: `examples.cold_chain_plan()` and
+  `examples.parcel_express_plan()` exist here only for now. The TypeScript
+  SDK will add `coldChainPlan()` and `parcelExpressPlan()` under the same
+  rule.
 
 ### What we don't want
 

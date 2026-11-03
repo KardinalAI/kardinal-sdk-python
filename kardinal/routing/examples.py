@@ -14,6 +14,7 @@ change in any release.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
 from . import models
@@ -95,11 +96,12 @@ def small_delivery_plan() -> PlanCreate:
     )
 
 
-def _tomorrow_at(hhmm: str) -> str:
+def _at_tomorrow() -> Callable[[str], str]:
     # The payloads write local wall-clock times, "YYYY-MM-DD HH:MM", read in
-    # the plan's `tz`.
+    # the plan's `tz`. The day is read once, so a plan built across midnight
+    # never mixes two dates.
     day = datetime.now(_DEMO_UTC_OFFSET) + timedelta(days=1)
-    return f"{day:%Y-%m-%d} {hhmm}"
+    return lambda hhmm: f"{day:%Y-%m-%d} {hhmm}"
 
 
 def cold_chain_plan() -> PlanCreate:
@@ -117,6 +119,7 @@ def cold_chain_plan() -> PlanCreate:
     - in the sandbox is free, and the answer carries warnings that traffic
       is ignored and that routes are computed as the crow flies.
     """
+    at = _at_tomorrow()
     depot = models.Position(lon=2.295, lat=48.872)
     # Driver tags: `driver` counts toward the one-driver-per-key-set limit,
     # `bi-temperature` selects the ambient/frozen compartment constraint.
@@ -128,7 +131,7 @@ def cold_chain_plan() -> PlanCreate:
             id="truck-1",
             vehicleProfile=models.VehicleProfileTruck(type="truck", withTraffic=True),
             workingTimeWindow=models.TimeWindow(
-                begin=_tomorrow_at("05:00"), end=_tomorrow_at("20:00")
+                begin=at("05:00"), end=at("20:00")
             ),
             departure=depot,
             arrival=depot,
@@ -155,7 +158,7 @@ def cold_chain_plan() -> PlanCreate:
                 id=f"driver-{i}",
                 vehicleProfile=models.VehicleProfileTruck(type="truck"),
                 workingTimeWindow=models.TimeWindow(
-                    begin=_tomorrow_at("07:00"), end=_tomorrow_at("17:00")
+                    begin=at("07:00"), end=at("17:00")
                 ),
                 departure=depot,
                 arrival=depot,
@@ -221,10 +224,10 @@ def cold_chain_plan() -> PlanCreate:
         )
         if i == 0:
             stop.authorizedTimeWindows = [
-                models.TaggedTimeWindow(begin=_tomorrow_at("08:00"), end=_tomorrow_at("18:00"))
+                models.TaggedTimeWindow(begin=at("08:00"), end=at("18:00"))
             ]
             stop.preferredTimeWindows = [
-                models.TaggedTimeWindow(begin=_tomorrow_at("14:00"), end=_tomorrow_at("16:00"))
+                models.TaggedTimeWindow(begin=at("14:00"), end=at("16:00"))
             ]
         orders.append(
             Order(
@@ -249,7 +252,7 @@ def cold_chain_plan() -> PlanCreate:
                         tags=["keychain:trusted-set-1"],
                         authorizedTimeWindows=[
                             models.TaggedTimeWindow(
-                                begin=_tomorrow_at("06:30"), end=_tomorrow_at("08:00")
+                                begin=at("06:30"), end=at("08:00")
                             )
                         ],
                     )
@@ -285,7 +288,7 @@ def cold_chain_plan() -> PlanCreate:
             # One driver per key set: each driver is charged for the keychain
             # stops it serves, and the cap keeps that to one driver.
             models.GlobalConstraintMaxCumulatedCost(
-                type=models.Type2.maxCumulatedCost,
+                type="maxCumulatedCost",
                 maximum=1,
                 costsByResourceTag={
                     "driver": models.Cost(
@@ -318,6 +321,7 @@ def parcel_express_plan() -> PlanCreate:
     - in the sandbox is free, and the answer carries warnings that traffic
       is ignored and that routes are computed as the crow flies.
     """
+    at = _at_tomorrow()
     depot = models.Position(lon=2.3522, lat=48.8566)
 
     def lunch_break() -> models.TimeWindowBreak:
@@ -325,7 +329,7 @@ def parcel_express_plan() -> PlanCreate:
         return models.TimeWindowBreak(
             type="timeWindowBreak",
             duration="PT45M",
-            timeWindow=models.TimeWindow(begin=_tomorrow_at("12:00"), end=_tomorrow_at("14:00")),
+            timeWindow=models.TimeWindow(begin=at("12:00"), end=at("14:00")),
         )
 
     def resource(
@@ -342,7 +346,7 @@ def parcel_express_plan() -> PlanCreate:
             id=id,
             vehicleProfile=profile,
             workingTimeWindow=models.TimeWindow(
-                begin=_tomorrow_at("07:00"), end=_tomorrow_at("17:00")
+                begin=at("07:00"), end=at("17:00")
             ),
             departure=depot,
             arrival=depot,
@@ -433,12 +437,12 @@ def parcel_express_plan() -> PlanCreate:
                     tags=["zone:usual-sector-7", "customer-slot"],
                     authorizedTimeWindows=[
                         models.TaggedTimeWindow(
-                            begin=_tomorrow_at("08:00"), end=_tomorrow_at("18:00")
+                            begin=at("08:00"), end=at("18:00")
                         )
                     ],
                     preferredTimeWindows=[
                         models.TaggedTimeWindow(
-                            begin=_tomorrow_at("14:00"), end=_tomorrow_at("16:00")
+                            begin=at("14:00"), end=at("16:00")
                         )
                     ],
                 )
