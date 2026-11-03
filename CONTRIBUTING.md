@@ -194,10 +194,6 @@ each stack:
   are plain values), a break the TypeScript SDK never had; each SDK
   follows its own numbering.
 - Pre-releases: TestPyPI here, the npm `next` dist-tag there.
-- Case-study plans: `examples.cold_chain_plan()` and
-  `examples.parcel_express_plan()` exist here only for now. The TypeScript
-  SDK will add `coldChainPlan()` and `parcelExpressPlan()` under the same
-  rule.
 
 ### What we don't want
 
