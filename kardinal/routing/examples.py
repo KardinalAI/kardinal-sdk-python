@@ -177,8 +177,8 @@ def cold_chain_plan() -> PlanCreate:
             capacities=capacities,
         )
 
-    # Compartments: each temperature class loads its own capacity, in the
-    # pickup and the delivery alike.
+    # Compartments: each order loads the capacity named for its own
+    # temperature need, in the pickup and the delivery alike.
     orders = [
         Order(
             id=f"order-{name}",

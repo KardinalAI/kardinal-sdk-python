@@ -132,8 +132,8 @@ copies.
 What stays stable about those two functions is their names and their
 `PlanCreate` return type. Their content follows the published page and may
 change in any release; the TypeScript SDK follows the same rule. The
-TypeScript SDK's copy of the payloads comes from these fixtures and this
-script.
+TypeScript SDK's copy of the payloads is meant to come from these fixtures
+and this script.
 
 ### Code generation notes
 
