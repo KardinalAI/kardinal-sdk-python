@@ -136,8 +136,9 @@ checking anything out there; run `git -C <mintlify repo> fetch` first.
   member.
 - Post-processing in `scripts/generate_models.sh`, applied on every
   regeneration, never by editing the generated file:
-  - an `ast` step inlines the scalar and enum wrappers the generator leaves
-    (a reference with a description, `allOf: [$ref]`) as plain types, or as
+  - an `ast` step inlines every wrapper the generator leaves (a reference
+    with a description, `allOf: [$ref]`, or a list with one kind of member)
+    as plain types, or as
     an `Annotated[...]` alias when the wrapper carries a pattern or other
     constraint, so the constraint is still checked; it also restores
     `discriminator='type'` on every union whose members all declare a `type`
