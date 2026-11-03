@@ -1,0 +1,144 @@
+{
+  "tz": "Europe/Paris",
+  "resources": [
+    {
+      "id": "truck-1",
+      "vehicleProfile": { "type": "truck", "withTraffic": true },
+      "workingTimeWindow": { "begin": "2026-08-03 05:00", "end": "2026-08-03 20:00" },
+      "departure": { "lon": 2.295, "lat": 48.872 },
+      "arrival": { "lon": 2.295, "lat": 48.872 },
+      "capacities": { "weight": 1200, "pallets": 12, "ambiant": 400, "frozen": 250 },
+      "preferredStopTags": ["zone:usual-sector-7"],
+      "tags": ["driver", "bi-temperature"],
+      "breaks": [{ "type": "workingDurationSlidingBreak", "minBreakDuration": "PT30M", "maxInterBreakDuration": "PT6H" }],
+      "maxWorkingDuration": "PT9H",
+      "cost": { "workedHours": { "costFloor": 8, "costCoeff": 1, "overcostFloor": 10, "overcostCoeff": 1.25 } }
+    },
+    {
+      "id": "driver-1",
+      "vehicleProfile": { "type": "truck" },
+      "workingTimeWindow": { "begin": "2026-08-03 07:00", "end": "2026-08-03 17:00" },
+      "departure": { "lon": 2.295, "lat": 48.872 },
+      "arrival": { "lon": 2.295, "lat": 48.872 },
+      "capacities": { "ambiant": 400, "frozen": 250 },
+      "tags": ["driver", "bi-temperature"]
+    },
+    {
+      "id": "driver-2",
+      "vehicleProfile": { "type": "truck" },
+      "workingTimeWindow": { "begin": "2026-08-03 07:00", "end": "2026-08-03 17:00" },
+      "departure": { "lon": 2.295, "lat": 48.872 },
+      "arrival": { "lon": 2.295, "lat": 48.872 },
+      "capacities": { "ambiant": 400, "frozen": 250 },
+      "tags": ["driver", "bi-temperature"]
+    }
+  ],
+  "orders": [
+    {
+      "id": "order-ambient",
+      "stops": [
+        { "type": "single", "id": "stop-pickup-ambient", "position": { "lon": 2.295, "lat": 48.872 }, "kind": "pickup", "operationDuration": "PT5M", "capacities": { "ambiant": 40 } },
+        { "type": "single", "id": "stop-ambient", "position": { "lon": 2.31, "lat": 48.882 }, "kind": "delivery", "operationDuration": "PT6M", "capacities": { "ambiant": 40 } }
+      ]
+    },
+    {
+      "id": "order-chilled",
+      "stops": [
+        { "type": "single", "id": "stop-pickup-chilled", "position": { "lon": 2.295, "lat": 48.872 }, "kind": "pickup", "operationDuration": "PT5M", "capacities": { "frozen": 30 } },
+        { "type": "single", "id": "stop-chilled", "position": { "lon": 2.275, "lat": 48.88 }, "kind": "delivery", "operationDuration": "PT6M", "capacities": { "frozen": 30 } }
+      ]
+    },
+    {
+      "id": "order-frozen",
+      "stops": [
+        { "type": "single", "id": "stop-pickup-frozen", "position": { "lon": 2.295, "lat": 48.872 }, "kind": "pickup", "operationDuration": "PT5M", "capacities": { "frozen": 20 } },
+        { "type": "single", "id": "stop-frozen", "position": { "lon": 2.305, "lat": 48.854 }, "kind": "delivery", "operationDuration": "PT6M", "capacities": { "frozen": 20 } }
+      ]
+    },
+    {
+      "id": "order-afternoon-0",
+      "stops": [
+        { "type": "single", "id": "stop-pickup-afternoon-0", "position": { "lon": 2.295, "lat": 48.872 }, "kind": "pickup", "operationDuration": "PT5M", "capacities": { "pallets": 1 } },
+        {
+          "type": "single",
+          "id": "stop-afternoon-0",
+          "position": { "lon": 2.32, "lat": 48.867 },
+          "kind": "delivery",
+          "operationDuration": "PT8M",
+          "capacities": { "pallets": 1 },
+          "tags": ["zone:usual-sector-7"],
+          "authorizedTimeWindows": [{ "begin": "2026-08-03 08:00", "end": "2026-08-03 18:00" }],
+          "preferredTimeWindows": [{ "begin": "2026-08-03 14:00", "end": "2026-08-03 16:00" }]
+        }
+      ]
+    },
+    {
+      "id": "order-afternoon-1",
+      "stops": [
+        { "type": "single", "id": "stop-pickup-afternoon-1", "position": { "lon": 2.295, "lat": 48.872 }, "kind": "pickup", "operationDuration": "PT5M", "capacities": { "pallets": 1 } },
+        { "type": "single", "id": "stop-afternoon-1", "position": { "lon": 2.265, "lat": 48.887 }, "kind": "delivery", "operationDuration": "PT8M", "capacities": { "pallets": 1 }, "tags": ["zone:usual-sector-7"] }
+      ]
+    },
+    {
+      "id": "order-afternoon-2",
+      "stops": [
+        { "type": "single", "id": "stop-pickup-afternoon-2", "position": { "lon": 2.295, "lat": 48.872 }, "kind": "pickup", "operationDuration": "PT5M", "capacities": { "pallets": 1 } },
+        { "type": "single", "id": "stop-afternoon-2", "position": { "lon": 2.3, "lat": 48.894 }, "kind": "delivery", "operationDuration": "PT8M", "capacities": { "pallets": 1 }, "tags": ["zone:overflow"] }
+      ]
+    },
+    {
+      "id": "order-keychain-0",
+      "stops": [
+        {
+          "type": "single",
+          "id": "stop-keychain-0",
+          "position": { "lon": 2.31, "lat": 48.882 },
+          "kind": "delivery",
+          "operationDuration": "PT5M",
+          "tags": ["keychain:trusted-set-1"],
+          "authorizedTimeWindows": [{ "begin": "2026-08-03 06:30", "end": "2026-08-03 08:00" }]
+        }
+      ]
+    },
+    {
+      "id": "order-keychain-1",
+      "stops": [
+        {
+          "type": "single",
+          "id": "stop-keychain-1",
+          "position": { "lon": 2.275, "lat": 48.88 },
+          "kind": "delivery",
+          "operationDuration": "PT5M",
+          "tags": ["keychain:trusted-set-1"],
+          "authorizedTimeWindows": [{ "begin": "2026-08-03 06:30", "end": "2026-08-03 08:00" }]
+        }
+      ]
+    },
+    {
+      "id": "order-keychain-2",
+      "stops": [
+        {
+          "type": "single",
+          "id": "stop-keychain-2",
+          "position": { "lon": 2.305, "lat": 48.854 },
+          "kind": "delivery",
+          "operationDuration": "PT5M",
+          "tags": ["keychain:trusted-set-1"],
+          "authorizedTimeWindows": [{ "begin": "2026-08-03 06:30", "end": "2026-08-03 08:00" }]
+        }
+      ]
+    }
+  ],
+  "objectives": ["maximizeMandatoryStops", "minimizeResources", "minimizeLargestTourDuration", "minimizeCosts", "maximizePreferredStops", "minimizeDelay", "minimizeWorkingDuration", "minimizeDistance"],
+  "additionalConstraints": [
+    { "type": "atLeastOneValidCapacity", "capacities": { "frozen": 0, "ambiant": 0 }, "name": "bi-temperature-single-mode-at-a-time", "resourceTags": ["bi-temperature"] }
+  ],
+  "globalConstraints": [
+    {
+      "type": "maxCumulatedCost",
+      "maximum": 1,
+      "costsByResourceTag": { "driver": { "costsByStopTag": { "keychain:trusted-set-1": { "costFloor": 0, "costCoeff": 1, "overcostFloor": 1, "overcostCoeff": 0 } } } },
+      "name": "one-driver-per-key-set"
+    }
+  ]
+}

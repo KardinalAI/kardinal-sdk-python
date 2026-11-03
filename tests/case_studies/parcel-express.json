@@ -1,0 +1,100 @@
+{
+  "tz": "Europe/Paris",
+  "resources": [
+    {
+      "id": "van-1",
+      "vehicleProfile": { "type": "car", "withTraffic": true },
+      "workingTimeWindow": { "begin": "2026-08-03 07:00", "end": "2026-08-03 17:00" },
+      "departure": { "lon": 2.3522, "lat": 48.8566 },
+      "arrival": { "lon": 2.3522, "lat": 48.8566 },
+      "capacities": { "parcels": 40, "weight": 600, "volume": 3.5, "highValueParcels": 8, "nbDeliveries": 8, "nbPickups": 2 },
+      "preferredStopTags": ["zone:usual-sector-7"],
+      "breaks": [{ "type": "timeWindowBreak", "duration": "PT45M", "timeWindow": { "begin": "2026-08-03 12:00", "end": "2026-08-03 14:00" } }]
+    },
+    {
+      "id": "van-2",
+      "vehicleProfile": { "type": "car", "withTraffic": true },
+      "workingTimeWindow": { "begin": "2026-08-03 07:00", "end": "2026-08-03 17:00" },
+      "departure": { "lon": 2.3522, "lat": 48.8566 },
+      "arrival": { "lon": 2.3522, "lat": 48.8566 },
+      "capacities": { "parcels": 40, "weight": 600, "nbDeliveries": 8, "nbPickups": 2 },
+      "breaks": [{ "type": "timeWindowBreak", "duration": "PT45M", "timeWindow": { "begin": "2026-08-03 12:00", "end": "2026-08-03 14:00" } }]
+    },
+    {
+      "id": "bike-1",
+      "vehicleProfile": { "type": "bicycle" },
+      "workingTimeWindow": { "begin": "2026-08-03 07:00", "end": "2026-08-03 17:00" },
+      "departure": { "lon": 2.3522, "lat": 48.8566 },
+      "arrival": { "lon": 2.3522, "lat": 48.8566 },
+      "capacities": { "parcels": 12, "weight": 50, "nbDeliveries": 8, "nbPickups": 2 },
+      "tags": ["zone:dense-center"]
+    },
+    {
+      "id": "walker-1",
+      "vehicleProfile": { "type": "pedestrian" },
+      "workingTimeWindow": { "begin": "2026-08-03 07:00", "end": "2026-08-03 17:00" },
+      "departure": { "lon": 2.3522, "lat": 48.8566 },
+      "arrival": { "lon": 2.3522, "lat": 48.8566 },
+      "capacities": { "parcels": 6, "weight": 20, "nbDeliveries": 8, "nbPickups": 2 },
+      "tags": ["zone:pedestrian-only"]
+    }
+  ],
+  "orders": [
+    {
+      "id": "order-paired-shipment",
+      "stops": [
+        { "type": "single", "id": "stop-pickup-shop", "position": { "lon": 2.3672, "lat": 48.8666 }, "kind": "pickup", "operationDuration": "PT4M", "capacities": { "parcels": 1, "weight": 12, "nbPickups": 1 } },
+        { "type": "single", "id": "stop-delivery-customer", "position": { "lon": 2.3322, "lat": 48.8646 }, "kind": "delivery", "operationDuration": "PT3M", "capacities": { "parcels": 1, "weight": 12, "nbDeliveries": 1 } }
+      ],
+      "successiveStops": false
+    },
+    {
+      "id": "order-standard-delivery",
+      "stops": [
+        {
+          "type": "single",
+          "id": "stop-customer-1",
+          "position": { "lon": 2.3622, "lat": 48.8386 },
+          "kind": "delivery",
+          "operationDuration": "PT8M",
+          "capacities": { "parcels": 1, "weight": 150, "nbDeliveries": 1 },
+          "tags": ["zone:usual-sector-7", "customer-slot"],
+          "authorizedTimeWindows": [{ "begin": "2026-08-03 08:00", "end": "2026-08-03 18:00" }],
+          "preferredTimeWindows": [{ "begin": "2026-08-03 14:00", "end": "2026-08-03 16:00" }]
+        }
+      ]
+    },
+    {
+      "id": "order-late-pickup",
+      "stops": [{ "type": "single", "id": "stop-pudo-pickup", "position": { "lon": 2.3222, "lat": 48.8716 }, "kind": "pickup", "operationDuration": "PT3M", "capacities": { "parcels": 1, "weight": 15, "nbPickups": 1 } }]
+    },
+    {
+      "id": "order-delivery-0",
+      "stops": [{ "type": "single", "id": "stop-delivery-0", "position": { "lon": 2.3622, "lat": 48.8386 }, "kind": "delivery", "operationDuration": "PT2M", "capacities": { "parcels": 1, "weight": 100, "nbDeliveries": 1 }, "tags": ["zone:usual-sector-7"] }]
+    },
+    {
+      "id": "order-delivery-1",
+      "stops": [{ "type": "single", "id": "stop-delivery-1", "position": { "lon": 2.3402, "lat": 48.8426 }, "kind": "delivery", "operationDuration": "PT2M", "capacities": { "parcels": 1, "weight": 100, "nbDeliveries": 1 }, "tags": ["zone:usual-sector-7"] }]
+    },
+    {
+      "id": "order-delivery-2",
+      "stops": [{ "type": "single", "id": "stop-delivery-2", "position": { "lon": 2.3772, "lat": 48.8516 }, "kind": "delivery", "operationDuration": "PT2M", "capacities": { "parcels": 1, "weight": 100, "nbDeliveries": 1 }, "tags": ["zone:usual-sector-7"] }]
+    },
+    {
+      "id": "order-delivery-3",
+      "stops": [{ "type": "single", "id": "stop-delivery-3", "position": { "lon": 2.3222, "lat": 48.8716 }, "kind": "delivery", "operationDuration": "PT2M", "capacities": { "parcels": 1, "weight": 100, "nbDeliveries": 1 }, "tags": ["zone:overflow"] }]
+    },
+    {
+      "id": "order-delivery-4",
+      "stops": [{ "type": "single", "id": "stop-delivery-4", "position": { "lon": 2.3572, "lat": 48.8786 }, "kind": "delivery", "operationDuration": "PT2M", "capacities": { "parcels": 1, "weight": 100, "nbDeliveries": 1 }, "tags": ["zone:overflow"] }]
+    },
+    {
+      "id": "order-delivery-5",
+      "stops": [{ "type": "single", "id": "stop-delivery-5", "position": { "lon": 2.3442, "lat": 48.8306 }, "kind": "delivery", "operationDuration": "PT2M", "capacities": { "parcels": 1, "weight": 100, "nbDeliveries": 1 }, "tags": ["zone:overflow"] }]
+    }
+  ],
+  "objectives": ["maximizeMandatoryStops", "minimizeResources", "minimizeDelay", "minimizeLargestTourDuration", "maximizePreferredStops", "minimizeDistance", "minimizeWorkingDuration"],
+  "additionalConstraints": [
+    { "type": "atLeastOneValidCapacity", "capacities": { "nbDeliveries": 0, "nbPickups": 0, "weight": 300 }, "name": "pudo-pickup-once-under-300kg" }
+  ]
+}
