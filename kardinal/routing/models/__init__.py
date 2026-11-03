@@ -1993,7 +1993,7 @@ class Type49(str, Enum):
 
 class AdditionalConstraintRemovalStrategy(BaseModel):
     """
-    `additionalConstraints` scope. Enforces a last-in-first-out unloading order on a resource: with `removalStrategy: "lifo"`, a resource can only unload the last thing it loaded. Not a rule about which stops get dropped from an over-constrained plan.
+    `additionalConstraints` scope. Enforces a last-in-first-out unloading order on a resource: with `strategy: "lifo"`, a resource can only unload the last thing it loaded. Not a rule about which stops get dropped from an over-constrained plan.
 
     > **When to use.** For a stacked or sequential-loading vehicle, such as a car carrier loading vehicles nose-to-tail on a single deck, or a multi-deck cage truck, where physically nothing can be unloaded except the item that went on last. Set it on the resource tag or tags representing that vehicle class.
 
@@ -2021,7 +2021,9 @@ class AdditionalConstraintRemovalStrategy(BaseModel):
         description='Capacity names tracked for the last-in-first-out ordering.',
         examples=[['volume', 'length']],
     )
-    removalStrategy: Optional[RemovalStrategyType] = Field(None, examples=['lifo'])
+    strategy: Optional[RemovalStrategyType] = Field(
+        None, description='The unloading order to enforce.', examples=['lifo']
+    )
 
 
 class Paging(BaseModel):
@@ -2662,7 +2664,9 @@ class RemovalStrategyViolation(BaseModel):
         description='The name of the RemovalStrategy constraint the violation is linked to.',
         examples=['lifoRule1'],
     )
-    removalStrategyType: RemovalStrategyType
+    strategy: RemovalStrategyType = Field(
+        ..., description='The unloading order that the tour breaks.'
+    )
 
 
 class WayPointBegin(BaseModel):
@@ -3209,7 +3213,7 @@ class Resource(BaseModel):
     )
     workingTimeWindow: TimeWindow = Field(
         ...,
-        description="Time window during which the resource is available to work. Often paired with `maxWorkingDuration`, since a wide window does not by itself mean a long shift.\n\n> **Modelling pitfall.** Spanning more than one calendar day does not, on its own, force any rest between working days. Encode daily rest explicitly in `breaks[]`, for example a `travelDurationSlidingBreak` sized for a full night's rest, or one `timeWindowBreak` per calendar day the plan spans.\n",
+        description='Time window during which the resource is available to work. Often paired with `maxWorkingDuration`, since a wide window does not by itself mean a long shift.\n\n> **Modelling pitfall.** Spanning more than one calendar day does not, on its own, force any rest between working days. Encode daily rest explicitly in `breaks[]`, for example one `timeWindowBreak` per night, with a window longer than the rest. See [Multi-day trips](https://developers.kardinal.ai/guides/multi-day).\n',
         examples=[
             {'begin': '2026-03-17T08:00:00+01:00', 'end': '2026-03-17T18:00:00+01:00'}
         ],

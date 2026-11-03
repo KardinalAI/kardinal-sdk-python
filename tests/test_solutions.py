@@ -457,3 +457,31 @@ def test_solution_warnings_with_a_code_this_sdk_does_not_know_still_parse() -> N
     )
     _, solutions = _apis()
     assert solutions.get(_PLAN_ID).warnings[0].code.value == "SOME_FUTURE_CODE"
+
+
+# The API reads and returns `strategy` on a last-in-first-out constraint and
+# its violation. Before the spec resync the SDK required `removalStrategyType`,
+# so reading a solution with such a violation failed.
+@respx.mock
+def test_get_reads_a_tour_that_breaks_the_unloading_order() -> None:
+    respx.get(f"{_PLAN_URL}/solution").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "item": {
+                    "planId": _PLAN_ID,
+                    "planVersion": 1,
+                    "tours": [
+                        {
+                            "resourceId": "truck-1",
+                            "violations": [{"type": "removalStrategy", "name": "x", "strategy": "lifo"}],
+                        }
+                    ],
+                }
+            },
+        )
+    )
+    _, solutions = _apis()
+    violation = solutions.get(_PLAN_ID).tours[0].violations[0]
+    assert violation.type == "removalStrategy"
+    assert violation.strategy == "lifo"
