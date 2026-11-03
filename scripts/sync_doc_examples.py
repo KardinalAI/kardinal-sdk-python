@@ -97,6 +97,8 @@ def full_payload(page: str, text: str) -> str:
     if start is None:
         sys.exit(f'{page}: no <Accordion title="Full payload ..."> found. Fix the page, or update CASE_STUDIES here.')
     for i in range(start + 1, len(lines)):
+        if "</Accordion>" in lines[i]:
+            break
         if lines[i].strip() == "```json":
             body = []
             for line in lines[i + 1:]:

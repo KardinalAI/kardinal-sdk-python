@@ -44,3 +44,9 @@ def test_a_full_payload_that_is_not_json_stops_the_script() -> None:
     page = '<Accordion title="Full payload">\n```json\n{oops\n```\n</Accordion>\n'
     with pytest.raises(SystemExit, match="not valid JSON"):
         sync.full_payload("case-studies/x.mdx", page)
+
+
+def test_a_next_json_block_after_the_accordion_is_not_taken_in_its_place() -> None:
+    page = '<Accordion title="Full payload">\nno block here\n</Accordion>\n\n```json\n{"later": 1}\n```\n'
+    with pytest.raises(SystemExit, match="no ```json block"):
+        sync.full_payload("case-studies/x.mdx", page)
