@@ -1,14 +1,18 @@
 import json
+import re
 import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 
 import httpx
 import pytest
 import respx
+import yaml
+from fake_api import FakeApi, mock_routes
 from typer.testing import CliRunner
 
-from kardinal._core.transport import DEFAULT_BASE_URL
+from kardinal._core.transport import DEFAULT_BASE_URL, sdk_version
 from kardinal.cli import app
 from kardinal.routing.examples import small_delivery_plan
 from kardinal.routing.plans import Plan
@@ -123,13 +127,72 @@ def test_auth_check_reports_base_url_and_agency(monkeypatch) -> None:
     assert payload["agencyId"] == "BLD1234567_production"
 
 
-def test_init_writes_a_skill_pointer_file(tmp_path, monkeypatch) -> None:
+_SKILL_PATH = Path(".claude/skills/kardinal/SKILL.md")
+
+
+def _init_skill(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ["init"])
     assert result.exit_code == 0
-    written = tmp_path / ".kardinal" / "SKILL.md"
+    return result, tmp_path / _SKILL_PATH
+
+
+def test_init_writes_the_skill_where_claude_code_loads_it(tmp_path, monkeypatch) -> None:
+    result, written = _init_skill(tmp_path, monkeypatch)
     assert written.exists()
-    assert "kardinal" in written.read_text()
+    assert not (tmp_path / ".kardinal" / "SKILL.md").exists()
+    assert str(written.resolve()) in result.stdout.replace("\n", "")
+    assert "/reload-skills" in result.stdout
+
+
+def test_init_skill_has_a_valid_front_matter_at_the_first_line(tmp_path, monkeypatch) -> None:
+    _, written = _init_skill(tmp_path, monkeypatch)
+    text = written.read_text()
+    assert text.startswith("---\n")
+    front_matter = yaml.safe_load(text.split("---\n")[1])
+    assert set(front_matter) == {"name", "description"}
+    assert front_matter["name"] == "kardinal"
+    assert front_matter["description"]
+
+
+def test_init_skill_cites_the_pitfalls_the_docs_and_the_version(tmp_path, monkeypatch) -> None:
+    _, written = _init_skill(tmp_path, monkeypatch)
+    text = written.read_text()
+    for expected in ("5 seconds", "about one minute", "unaffectedStopIds", "final state"):
+        assert expected in text
+    assert "https://developers.kardinal.ai/llms.txt" in text
+    assert "https://developers.kardinal.ai/getting-started/agent-modeling-checklist" in text
+    assert sdk_version() in text
+    assert "{version}" not in text
+
+
+@respx.mock
+def test_init_skill_example_runs_against_the_mocked_api(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("time.sleep", lambda _seconds: None)
+    api = FakeApi()
+    mock_routes(api)
+    _, written = _init_skill(tmp_path, monkeypatch)
+    blocks = re.findall(r"^```python\n(.*?)^```", written.read_text(), re.MULTILINE | re.DOTALL)
+    assert len(blocks) == 1
+    exec(compile(blocks[0], "SKILL.md python block", "exec"), {})
+
+
+def test_init_leaves_the_old_pointer_file_and_says_it_can_be_deleted(tmp_path, monkeypatch) -> None:
+    old = tmp_path / ".kardinal" / "SKILL.md"
+    old.parent.mkdir()
+    old.write_text("old pointer")
+    result, _ = _init_skill(tmp_path, monkeypatch)
+    assert old.read_text() == "old pointer"
+    assert ".kardinal/SKILL.md" in result.stdout
+    assert "can be deleted" in result.stdout
+
+
+def test_init_twice_overwrites_with_the_same_content(tmp_path, monkeypatch) -> None:
+    _, written = _init_skill(tmp_path, monkeypatch)
+    first = written.read_text()
+    written.write_text("local edit")
+    _init_skill(tmp_path, monkeypatch)
+    assert written.read_text() == first
 
 
 def test_submit_rejects_malformed_json_with_clean_error_not_a_traceback(tmp_path) -> None:
