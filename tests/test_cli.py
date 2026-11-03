@@ -127,7 +127,7 @@ def test_auth_check_reports_base_url_and_agency(monkeypatch) -> None:
     assert payload["agencyId"] == "BLD1234567_production"
 
 
-_SKILL_PATH = Path(".claude/skills/kardinal/SKILL.md")
+_SKILL_PATH = Path(".claude/skills/kardinal-python/SKILL.md")
 
 
 def _init_skill(tmp_path, monkeypatch):
@@ -151,8 +151,19 @@ def test_init_skill_has_a_valid_front_matter_at_the_first_line(tmp_path, monkeyp
     assert text.startswith("---\n")
     front_matter = yaml.safe_load(text.split("---\n")[1])
     assert set(front_matter) == {"name", "description"}
-    assert front_matter["name"] == "kardinal"
+    assert front_matter["name"] == "kardinal-python"
+    assert front_matter["name"] == written.parent.name
     assert front_matter["description"]
+
+
+def test_init_skill_says_the_wait_timeout_is_a_sandbox_value(tmp_path, monkeypatch) -> None:
+    _, written = _init_skill(tmp_path, monkeypatch)
+    text = written.read_text()
+    assert "maxOptimizationDuration" in text
+    assert (
+        "solutions.wait(plan.id, timeout=60)  "
+        "# sandbox value; in production, allow more than the plan's maxOptimizationDuration"
+    ) in text
 
 
 def test_init_skill_cites_the_pitfalls_the_docs_and_the_version(tmp_path, monkeypatch) -> None:

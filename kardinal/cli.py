@@ -54,7 +54,7 @@ def auth_check(json_out: bool = typer.Option(False, "--json", help="Force JSON o
 
 _SKILL = """\
 ---
-name: kardinal
+name: kardinal-python
 description: "Use when writing, running or debugging code that calls the Kardinal route optimization API with the kardinal Python SDK (kardinal-ai): building a plan, submitting it, waiting for its solution, and reading its tours and stops."
 ---
 
@@ -68,7 +68,7 @@ from kardinal.routing import examples, models
 
 k = Kardinal()  # reads KARDINAL_API_KEY
 plan = k.routing.plans.submit(examples.small_delivery_plan())
-solution = k.routing.solutions.wait(plan.id, timeout=60)
+solution = k.routing.solutions.wait(plan.id, timeout=60)  # sandbox value; in production, allow more than the plan's maxOptimizationDuration
 if solution.final_state == models.PlanState.optimized:
     for tour in solution.tours or []:
         stops = [wp.stopId for wp in tour.wayPoints or [] if wp.type == "stop"]
@@ -92,10 +92,10 @@ print("left out:", solution.unaffectedStopIds or [])
 
 @app.command("init")
 def init() -> None:
-    """Write a Claude Code skill for this SDK (.claude/skills/kardinal/SKILL.md):
+    """Write a Claude Code skill for this SDK (.claude/skills/kardinal-python/SKILL.md):
     run it at the repository root.
     """
-    target = Path(".claude/skills/kardinal/SKILL.md")
+    target = Path(".claude/skills/kardinal-python/SKILL.md")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(_SKILL.replace("{version}", sdk_version()))
     typer.echo(f"Wrote {target.resolve()}")
