@@ -21,20 +21,6 @@ python3 -m datamodel_code_generator \
   --disable-timestamp \
   --output "$OUTPUT"
 
-# openapi.yaml has two `oneOf` unions with exactly one member
-# (`GlobalViolationMaxCumulatedCost`, `GlobalConstraintMaxCumulatedCost`).
-# datamodel-codegen still attaches `discriminator='type'` to their RootModel
-# wrapper even though there is nothing to discriminate between, and pydantic
-# v2 refuses that combination outright (`PydanticUserError: ... needs field
-# 'type' to be of type Literal`) — the generated module fails to import at
-# all otherwise. A one-choice union needs no discriminator, so this drops it;
-# every real (multi-member) discriminated union in the spec is untouched.
-sed -i.bak \
-  -e "s/root: GlobalViolationMaxCumulatedCost = Field(\.\.\., discriminator='type')/root: GlobalViolationMaxCumulatedCost = Field(...)/" \
-  -e "s/root: GlobalConstraintMaxCumulatedCost = Field(\.\.\., discriminator='type')/root: GlobalConstraintMaxCumulatedCost = Field(...)/" \
-  "$OUTPUT"
-rm -f "$OUTPUT.bak"
-
 # `--collapse-root-models` unwraps most single-value RootModels, so a stop id
 # is a `str`, a plan version an `int`, and a tour's `wayPoints` a plain list
 # of the four waypoint models: no `.root`, `json.dumps` accepts them. Two

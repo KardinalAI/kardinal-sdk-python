@@ -143,9 +143,6 @@ checking anything out there; run `git -C <mintlify repo> fetch` first.
     constraint, so the constraint is still checked; it also restores
     `discriminator='type'` on every union whose members all declare a `type`
     literal, which the collapse drops;
-  - two single-choice `oneOf` unions carry a discriminator despite having
-    nothing to discriminate, which makes the module fail to import, so it
-    is removed from them;
   - the trailing `model_rebuild()` calls are sorted, to keep the output
     byte-identical across Python builds.
 - Enums print as their value (`str(PlanState.optimized)` is `optimized`, on
