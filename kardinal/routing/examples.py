@@ -95,10 +95,10 @@ def small_delivery_plan() -> PlanCreate:
     )
 
 
-def _tomorrow_at(hhmm: str, days: int = 0) -> str:
+def _tomorrow_at(hhmm: str) -> str:
     # The payloads write local wall-clock times, "YYYY-MM-DD HH:MM", read in
-    # the plan's `tz`; `days` moves past tomorrow, for a later day.
-    day = datetime.now(_DEMO_UTC_OFFSET) + timedelta(days=1 + days)
+    # the plan's `tz`.
+    day = datetime.now(_DEMO_UTC_OFFSET) + timedelta(days=1)
     return f"{day:%Y-%m-%d} {hhmm}"
 
 
