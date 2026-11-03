@@ -167,14 +167,30 @@ def test_init_skill_cites_the_pitfalls_the_docs_and_the_version(tmp_path, monkey
 
 
 @respx.mock
-def test_init_skill_example_runs_against_the_mocked_api(tmp_path, monkeypatch) -> None:
+def test_init_skill_example_runs_against_the_mocked_api(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setattr("time.sleep", lambda _seconds: None)
     api = FakeApi()
+    position = {"lat": 48.85, "lon": 2.35}
+
+    def solution_with_a_stop(_request):
+        tour = {
+            "resourceId": api.plan["resources"][0]["id"],
+            "wayPoints": [
+                {"type": "begin", "position": position},
+                {"type": "stop", "stopId": "s1", "position": position},
+                {"type": "end", "position": position},
+            ],
+        }
+        item = {"planId": _PLAN_ID, "planVersion": api.plan["version"], "tours": [tour]}
+        return httpx.Response(200, json={"item": item})
+
+    api.solution = solution_with_a_stop
     mock_routes(api)
     _, written = _init_skill(tmp_path, monkeypatch)
     blocks = re.findall(r"^```python\n(.*?)^```", written.read_text(), re.MULTILINE | re.DOTALL)
     assert len(blocks) == 1
     exec(compile(blocks[0], "SKILL.md python block", "exec"), {})
+    assert "['s1']" in capsys.readouterr().out
 
 
 def test_init_leaves_the_old_pointer_file_and_says_it_can_be_deleted(tmp_path, monkeypatch) -> None:
