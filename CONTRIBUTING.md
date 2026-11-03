@@ -131,9 +131,9 @@ copies.
 
 What stays stable about those two functions is their names and their
 `PlanCreate` return type. Their content follows the published page and may
-change in any release; the TypeScript SDK will follow the same rule. The
-TypeScript SDK's copy of the payloads is meant to come from these fixtures
-and this script.
+change in any release; the TypeScript SDK follows the same rule. It copies the
+same blocks with its own script (`scripts/sync-doc-examples.mjs`) into
+`tests/case-studies/`.
 
 ### Code generation notes
 
