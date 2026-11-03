@@ -64,3 +64,26 @@ def test_cold_chain_plan_is_fresh_and_follows_tomorrow() -> None:
     assert a is not examples.cold_chain_plan()
     tomorrow = (datetime.now(timezone(timedelta(hours=1))) + timedelta(days=1)).date()
     assert a.resources[0].workingTimeWindow.begin == f"{tomorrow} 05:00"
+
+
+def test_parcel_express_plan_equals_the_published_payload(monkeypatch) -> None:
+    monkeypatch.setattr(examples, "datetime", _PinnedNow)
+    published = json.loads(
+        (Path(__file__).parent / "case_studies" / "parcel-express.json").read_text()
+    )
+    plan = examples.parcel_express_plan()
+    assert plan.model_dump(mode="json", exclude_unset=True) == published
+    # The docstring states the stop count: keep it in step with the payload.
+    assert sum(len(order.stops) for order in plan.orders or []) == 10
+
+
+def test_parcel_express_plan_passes_local_validation() -> None:
+    plan = examples.parcel_express_plan()
+    assert PlanCreate.model_validate(plan.model_dump(exclude_none=True)) is not None
+
+
+def test_parcel_express_plan_is_fresh_and_follows_tomorrow() -> None:
+    a = examples.parcel_express_plan()
+    assert a is not examples.parcel_express_plan()
+    tomorrow = (datetime.now(timezone(timedelta(hours=1))) + timedelta(days=1)).date()
+    assert a.resources[0].workingTimeWindow.begin == f"{tomorrow} 07:00"

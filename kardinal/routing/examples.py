@@ -295,3 +295,206 @@ def cold_chain_plan() -> PlanCreate:
             )
         ],
     )
+
+
+def parcel_express_plan() -> PlanCreate:
+    """The plan of the parcel express case study, built field by field:
+    https://developers.kardinal.ai/case-studies/parcel-express
+
+    Two vans, one cargo bike and one walker deliver and collect parcels in
+    Paris, from one depot, with a lunch break, a customer slot and zones.
+    Dates move to tomorrow.
+
+    Submitting it as is:
+
+    - with a production key costs one credit per stop, so 10 credits here;
+    - leaves `maxOptimizationDuration` unset, so production optimizes for up
+      to 15 minutes and stops earlier once the result stops improving;
+    - in the sandbox is free, and the answer carries warnings that traffic
+      is ignored and that routes are computed as the crow flies.
+    """
+    depot = models.Position(lon=2.3522, lat=48.8566)
+
+    def lunch_break() -> models.TimeWindowBreak:
+        # 45 minutes, anywhere in the midday window.
+        return models.TimeWindowBreak(
+            type="timeWindowBreak",
+            duration="PT45M",
+            timeWindow=models.TimeWindow(begin=_tomorrow_at("12:00"), end=_tomorrow_at("14:00")),
+        )
+
+    def resource(
+        id: str,
+        profile: models.VehicleProfileCar
+        | models.VehicleProfileBicycle
+        | models.VehicleProfilePedestrian,
+        capacities: dict[str, float],
+        **extra: object,
+    ) -> models.Resource:
+        # Same depot and same day for the whole fleet; the two counters cap
+        # each tour at 8 deliveries and 2 pickups.
+        return models.Resource(
+            id=id,
+            vehicleProfile=profile,
+            workingTimeWindow=models.TimeWindow(
+                begin=_tomorrow_at("07:00"), end=_tomorrow_at("17:00")
+            ),
+            departure=depot,
+            arrival=depot,
+            capacities={**capacities, "nbDeliveries": 8, "nbPickups": 2},
+            **extra,  # type: ignore[arg-type]
+        )
+
+    resources = [
+        # First van: bigger load, a preferred sector and a lunch break.
+        resource(
+            "van-1",
+            models.VehicleProfileCar(type="car", withTraffic=True),
+            {"parcels": 40, "weight": 600, "volume": 3.5, "highValueParcels": 8},
+            preferredStopTags=["zone:usual-sector-7"],
+            breaks=[lunch_break()],
+        ),
+        resource(
+            "van-2",
+            models.VehicleProfileCar(type="car", withTraffic=True),
+            {"parcels": 40, "weight": 600},
+            breaks=[lunch_break()],
+        ),
+        # Zone tags are plain labels: the bike and the walker serve the
+        # stops of their zone through their own tag.
+        resource(
+            "bike-1",
+            models.VehicleProfileBicycle(type="bicycle"),
+            {"parcels": 12, "weight": 50},
+            tags=["zone:dense-center"],
+        ),
+        resource(
+            "walker-1",
+            models.VehicleProfilePedestrian(type="pedestrian"),
+            {"parcels": 6, "weight": 20},
+            tags=["zone:pedestrian-only"],
+        ),
+    ]
+
+    def single(
+        id: str,
+        lon: float,
+        lat: float,
+        kind: models.StopKind,
+        duration: str,
+        weight: float,
+        counter: str,
+        **extra: object,
+    ) -> models.SingleStop:
+        # Every stop is one parcel, counted in `parcels` and in its counter.
+        return models.SingleStop(
+            type="single",
+            id=id,
+            position=models.Position(lon=lon, lat=lat),
+            kind=kind,
+            operationDuration=duration,
+            capacities={"parcels": 1, "weight": weight, counter: 1},
+            **extra,  # type: ignore[arg-type]
+        )
+
+    pickup, delivery = models.StopKind.pickup, models.StopKind.delivery
+    orders = [
+        # A shop shipment: pickup then delivery, by the same tour, not
+        # necessarily back to back.
+        Order(
+            id="order-paired-shipment",
+            stops=[
+                single("stop-pickup-shop", 2.3672, 48.8666, pickup, "PT4M", 12, "nbPickups"),
+                single(
+                    "stop-delivery-customer", 2.3322, 48.8646, delivery, "PT3M", 12, "nbDeliveries"
+                ),
+            ],
+            successiveStops=False,
+        ),
+        # A delivery with a customer slot: authorized all day, preferred
+        # in the afternoon.
+        Order(
+            id="order-standard-delivery",
+            stops=[
+                single(
+                    "stop-customer-1",
+                    2.3622,
+                    48.8386,
+                    delivery,
+                    "PT8M",
+                    150,
+                    "nbDeliveries",
+                    tags=["zone:usual-sector-7", "customer-slot"],
+                    authorizedTimeWindows=[
+                        models.TaggedTimeWindow(
+                            begin=_tomorrow_at("08:00"), end=_tomorrow_at("18:00")
+                        )
+                    ],
+                    preferredTimeWindows=[
+                        models.TaggedTimeWindow(
+                            begin=_tomorrow_at("14:00"), end=_tomorrow_at("16:00")
+                        )
+                    ],
+                )
+            ],
+        ),
+        # A pickup point collection, at the same address as delivery 3.
+        Order(
+            id="order-late-pickup",
+            stops=[single("stop-pudo-pickup", 2.3222, 48.8716, pickup, "PT3M", 15, "nbPickups")],
+        ),
+    ]
+
+    # Six standard deliveries: three in the preferred sector, three in the
+    # overflow zone.
+    for i, (lon, lat, zone) in enumerate(
+        [
+            (2.3622, 48.8386, "zone:usual-sector-7"),
+            (2.3402, 48.8426, "zone:usual-sector-7"),
+            (2.3772, 48.8516, "zone:usual-sector-7"),
+            (2.3222, 48.8716, "zone:overflow"),
+            (2.3572, 48.8786, "zone:overflow"),
+            (2.3442, 48.8306, "zone:overflow"),
+        ]
+    ):
+        orders.append(
+            Order(
+                id=f"order-delivery-{i}",
+                stops=[
+                    single(
+                        f"stop-delivery-{i}",
+                        lon,
+                        lat,
+                        delivery,
+                        "PT2M",
+                        100,
+                        "nbDeliveries",
+                        tags=[zone],
+                    )
+                ],
+            )
+        )
+
+    return PlanCreate(
+        tz="Europe/Paris",
+        resources=resources,
+        orders=orders,
+        objectives=[
+            models.ObjectivesEnum.maximizeMandatoryStops,
+            models.ObjectivesEnum.minimizeResources,
+            models.ObjectivesEnum.minimizeDelay,
+            models.ObjectivesEnum.minimizeLargestTourDuration,
+            models.ObjectivesEnum.maximizePreferredStops,
+            models.ObjectivesEnum.minimizeDistance,
+            models.ObjectivesEnum.minimizeWorkingDuration,
+        ],
+        additionalConstraints=[
+            # At every stop of a tour, at least one of these three loads is
+            # at or under its threshold (an OR, not all three together).
+            models.AdditionalConstraintAtLeastOneValidCapacity(
+                type="atLeastOneValidCapacity",
+                capacities={"nbDeliveries": 0, "nbPickups": 0, "weight": 300},
+                name="pudo-pickup-once-under-300kg",
+            )
+        ],
+    )
