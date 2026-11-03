@@ -69,7 +69,7 @@ class PlanCreate(BaseModel):
             ]
         ]
     ] = None
-    globalConstraints: Optional[List[models.GlobalConstraints]] = None
+    globalConstraints: Optional[List[models.GlobalConstraintMaxCumulatedCost]] = None
     accessDurationsByStopTag: Optional[Dict[str, models.Duration]] = None
     overlappingCapacitiesByStopTag: Optional[Dict[str, int]] = None
     setupDurations: Optional[List[models.SetupDuration]] = None

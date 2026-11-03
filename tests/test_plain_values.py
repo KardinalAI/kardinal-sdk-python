@@ -4,12 +4,12 @@
 
 import json
 import typing
-from enum import Enum
 
 import httpx
+import pydantic
 import pytest
 import respx
-from pydantic import BaseModel, RootModel, ValidationError
+from pydantic import RootModel, ValidationError
 
 from kardinal._core.transport import DEFAULT_BASE_URL, Transport
 from kardinal.routing import models
@@ -18,7 +18,6 @@ from kardinal.routing.solutions import SolutionsAPI
 
 _PLAN_ID = "4cbd0ab8-282c-4b30-b981-29e1ed8a2016"
 _AGENCY = "BLD0000001_demo"
-_SCALARS = (str, int, float, bool)
 
 
 def _apis():
@@ -88,28 +87,37 @@ def test_a_stored_plan_dumps_to_json_as_it_is() -> None:
     assert listed.state == "optimized"
 
 
-def _unwrapped(annotation) -> list:
-    """Every class an annotation mentions, through Optional, List, Dict,
-    Union and Annotated."""
-    found = [annotation] if isinstance(annotation, type) else []
-    for arg in typing.get_args(annotation):
-        found += _unwrapped(arg)
-    return found
-
-
-def test_no_model_field_is_a_wrapper_around_a_scalar_or_an_enum() -> None:
-    offenders = []
-    for name, cls in vars(models).items():
-        if not (isinstance(cls, type) and issubclass(cls, BaseModel)) or cls is BaseModel:
-            continue
-        for field_name, field in cls.model_fields.items():
-            for inner in _unwrapped(field.annotation):
-                if not (isinstance(inner, type) and issubclass(inner, RootModel)):
-                    continue
-                root = inner.model_fields["root"].annotation
-                if isinstance(root, type) and issubclass(root, (*_SCALARS, Enum)):
-                    offenders.append(f"{name}.{field_name}: {inner.__name__}")
+def test_no_model_is_a_root_model() -> None:
+    """A RootModel needs `.root` and is refused by `json.dumps`. One around an
+    object or a list would also disappear by itself the day the spec gains a
+    second kind of member, so none is left."""
+    offenders = [
+        name
+        for name, cls in vars(models).items()
+        if isinstance(cls, type) and issubclass(cls, RootModel) and cls is not RootModel
+    ]
     assert offenders == []
+
+
+@respx.mock
+def test_global_constraints_and_violations_are_read_without_root() -> None:
+    respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}/solution").mock(
+        return_value=httpx.Response(200, json={"item": {
+            "planId": _PLAN_ID, "planVersion": 2, "tours": [],
+            "globalViolations": [{"type": "maxCumulatedCost", "currency": "EUR",
+                                  "maximum": 10, "actual": 12}],
+        }})
+    )
+    solution = _apis()[1].get(_PLAN_ID)
+    assert solution.globalViolations[0].type == "maxCumulatedCost"
+
+
+def test_a_pair_of_incompatible_stops_still_needs_exactly_two_ids() -> None:
+    adapter = pydantic.TypeAdapter(models.Incompatibility)
+    assert adapter.validate_python(["a", "b"]) == ["a", "b"]
+    for bad in (["a"], ["a", "b", "c"], ["a", "b c"]):
+        with pytest.raises(ValidationError):
+            adapter.validate_python(bad)
 
 
 def test_the_unions_of_stops_and_waypoints_keep_their_discriminator() -> None:
@@ -150,19 +158,3 @@ def test_an_invalid_id_or_duration_is_still_refused() -> None:
         models.Order.model_validate({"id": "o1", "stops": [], "requiredSkills": ["a b"]})
     with pytest.raises(ValidationError):
         PlanCreate.model_validate({"resources": [], "accessDurationsByStopTag": {"t": "10s"}})
-
-
-def test_no_scalar_root_model_is_left_for_the_equality_patch_to_cover() -> None:
-    """`_annotations.py` no longer patches `==`/`hash`/`str` on scalar
-    RootModels, because the generated models hold none. If one reappears,
-    this fails, and the patch has to come back."""
-    scalar_roots = [
-        name
-        for name, cls in vars(models).items()
-        if isinstance(cls, type)
-        and issubclass(cls, RootModel)
-        and cls is not RootModel
-        and isinstance(cls.model_fields["root"].annotation, type)
-        and issubclass(cls.model_fields["root"].annotation, (*_SCALARS, Enum))
-    ]
-    assert scalar_roots == []

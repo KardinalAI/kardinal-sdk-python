@@ -1684,8 +1684,7 @@ class Type35(str, Enum):
     stopIncompatibility = 'stopIncompatibility'
 
 
-class Incompatibility(RootModel[List[RegexIdValidation]]):
-    root: List[RegexIdValidation] = Field(..., max_length=2, min_length=2)
+Incompatibility = Annotated[List[RegexIdValidation], Field(max_length=2, min_length=2)]
 
 
 class StopIncompatibilityViolation(BaseModel):
@@ -2595,10 +2594,6 @@ class EnvelopedErrors(BaseModel):
     )
 
 
-class GlobalViolations(RootModel[GlobalViolationMaxCumulatedCost]):
-    root: GlobalViolationMaxCumulatedCost = Field(...)
-
-
 class EnvelopedSolutionObjectives(BaseModel):
     """
     A page of achieved objective values, as returned by the objectives-listing endpoint.
@@ -3372,10 +3367,6 @@ class GlobalConstraintMaxCumulatedCost(BaseModel):
     )
 
 
-class GlobalConstraints(RootModel[GlobalConstraintMaxCumulatedCost]):
-    root: GlobalConstraintMaxCumulatedCost = Field(...)
-
-
 class Plan(BaseModel):
     """
     A full plan for a date and agency, with its associated resources, orders, constraints, and so on.
@@ -3453,7 +3444,7 @@ class Plan(BaseModel):
         None,
         description="Extra constraints layered on top of resources' and orders' own fields, such as forbidden assignments or capacity ceilings shared across a group of stops.",
     )
-    globalConstraints: Optional[List[GlobalConstraints]] = Field(
+    globalConstraints: Optional[List[GlobalConstraintMaxCumulatedCost]] = Field(
         None,
         description='List of global constraints to be satisfied by the returned solution.',
     )
@@ -3695,7 +3686,7 @@ class Solution(BaseModel):
         None,
         description="Total toll costs of the solution, by currency code (sum of each tour's `tollCostsByCurrency`).",
     )
-    globalViolations: Optional[List[GlobalViolations]] = Field(
+    globalViolations: Optional[List[GlobalViolationMaxCumulatedCost]] = Field(
         None,
         description='Constraint violations that apply to the solution as a whole rather than to a single tour.',
     )

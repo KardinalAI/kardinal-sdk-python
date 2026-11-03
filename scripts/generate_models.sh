@@ -44,7 +44,10 @@ rm -f "$OUTPUT.bak"
 #     (`Plan.state`, `WayPoint*.status`, `Tour.mode`, ...). The generator
 #     keeps such a reference wrapped, so `plan.state` stays a RootModel that
 #     `json.dumps` refuses and that needs `.root`. Every remaining RootModel
-#     around a scalar or an enum is replaced by its inner type. When it
+#     (around a scalar, an enum, an object or a list: a list with a single
+#     kind of member, such as the global constraints, is wrapped the same
+#     way, and would lose its wrapper by itself the day a second kind
+#     appears) is replaced by its inner type. When it
 #     carries a constraint (an id or duration pattern) the name stays, as an
 #     `Annotated[...]` alias, so the constraint is still checked.
 #  2. The collapse drops `discriminator='type'` from the unions of stops,
@@ -58,7 +61,6 @@ import re
 import sys
 
 path = sys.argv[1]
-SCALARS = {"str", "int", "float", "bool", "UUID", "AwareDatetime", "datetime"}
 CONSTRAINTS = {
     "pattern", "min_length", "max_length", "ge", "le", "gt", "lt", "multiple_of",
 }
@@ -80,13 +82,8 @@ src = open(path).read()
 lines = src.splitlines(keepends=True)
 tree = ast.parse(src)
 classes = {n.name: n for n in tree.body if isinstance(n, ast.ClassDef)}
-enums = {
-    n for n, c in classes.items()
-    if any(ast.unparse(b) in ("Enum", "str, Enum") or getattr(b, "id", "") == "Enum"
-           for b in c.bases)
-}
 
-# 1. scalar / enum wrappers -> inner type
+# 1. every RootModel wrapper (scalar, enum, object, list) -> inner type
 inline = {}
 aliases = {}
 for name, cls in classes.items():
@@ -96,8 +93,6 @@ for name, cls in classes.items():
     if not (isinstance(base, ast.Subscript) and ast.unparse(base.value) == "RootModel"):
         continue
     inner = ast.unparse(base.slice)
-    if inner not in SCALARS and inner not in enums:
-        continue
     root = next(
         (s for s in cls.body if isinstance(s, ast.AnnAssign) and s.target.id == "root"),
         None,
