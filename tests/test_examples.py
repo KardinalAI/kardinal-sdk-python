@@ -1,4 +1,6 @@
-from datetime import datetime, timezone
+import json
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from kardinal.routing import examples
 from kardinal.routing.plans import PlanCreate
@@ -32,3 +34,33 @@ def test_tomorrow_is_computed_at_plus_one_hour_not_in_utc(monkeypatch) -> None:
     monkeypatch.setattr(examples, "datetime", _FixedDatetime)
     begin = examples.small_delivery_plan().resources[0].workingTimeWindow.begin
     assert str(begin) == "2026-10-03T08:00:00+01:00"
+
+
+class _PinnedNow(datetime):
+    # 23:30 UTC on 2026-08-01 is 00:30 on 2026-08-02 at +01:00, so tomorrow is 2026-08-03.
+    @classmethod
+    def now(cls, tz=None):
+        return datetime(2026, 8, 1, 23, 30, tzinfo=timezone.utc).astimezone(tz)
+
+
+def test_cold_chain_plan_equals_the_published_payload(monkeypatch) -> None:
+    monkeypatch.setattr(examples, "datetime", _PinnedNow)
+    published = json.loads(
+        (Path(__file__).parent / "case_studies" / "cold-chain-last-mile.json").read_text()
+    )
+    plan = examples.cold_chain_plan()
+    assert plan.model_dump(mode="json", exclude_unset=True) == published
+    # The docstring states the stop count: keep it in step with the payload.
+    assert sum(len(order.stops) for order in plan.orders or []) == 15
+
+
+def test_cold_chain_plan_passes_local_validation() -> None:
+    plan = examples.cold_chain_plan()
+    assert PlanCreate.model_validate(plan.model_dump(exclude_none=True)) is not None
+
+
+def test_cold_chain_plan_is_fresh_and_follows_tomorrow() -> None:
+    a = examples.cold_chain_plan()
+    assert a is not examples.cold_chain_plan()
+    tomorrow = (datetime.now(timezone(timedelta(hours=1))) + timedelta(days=1)).date()
+    assert a.resources[0].workingTimeWindow.begin == f"{tomorrow} 05:00"
