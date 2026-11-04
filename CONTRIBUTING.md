@@ -196,9 +196,9 @@ each stack:
   Zod rejects.
 - Timeout: `httpx` applies `timeout` to each phase of a request; the
   TypeScript SDK's `timeoutMs` covers the whole request, response included.
-- API warnings: the TypeScript SDK passes the warning line to `onWarning`
-  and guards a handler that throws. This SDK logs the line on the `kardinal`
-  logger, and `logging` already catches a failing handler.
+- API warnings: the TypeScript SDK passes the warning line to `onWarning`.
+  This SDK logs the line on the `kardinal` logger. Both SDKs guard a failing
+  handler: the error goes to stderr and the call still returns the plan.
 - Validation messages (`plans validate`): the wording of pattern, missing
   field and unknown field errors is shared; other messages come from
   pydantic here and from Zod there.

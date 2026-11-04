@@ -103,6 +103,38 @@ def test_update_and_replace_log_the_same_way(caplog, call) -> None:
     assert len(_records(caplog)) == 1
 
 
+class _RaisingHandler(logging.Handler):
+    def emit(self, record):
+        raise RuntimeError("handler broke")
+
+
+class _RaisingFilter(logging.Filter):
+    def filter(self, record):
+        raise RuntimeError("filter broke")
+
+
+@respx.mock
+@pytest.mark.parametrize("broken", [_RaisingHandler(), _RaisingFilter()], ids=["handler", "filter"])
+def test_a_failing_log_handler_or_filter_does_not_make_submit_fail(broken, capsys) -> None:
+    _mock("POST", f"{DEFAULT_BASE_URL}/plans", _crow(1), 201)
+    logger = logging.getLogger("kardinal")
+    logger.addHandler(broken) if isinstance(broken, logging.Handler) else logger.addFilter(broken)
+    try:
+        plan = _plans().submit(PlanCreate(resources=[]))
+    finally:
+        logger.removeHandler(broken) if isinstance(broken, logging.Handler) else logger.removeFilter(broken)
+    assert plan.id == _PLAN_ID
+    assert "logging the API warning failed" in capsys.readouterr().err
+
+
+@respx.mock
+def test_an_empty_path_is_not_listed(caplog) -> None:
+    _mock("POST", f"{DEFAULT_BASE_URL}/plans", [_warning(path="", details="Amended")], 201)
+    with caplog.at_level(logging.WARNING, logger="kardinal"):
+        _plans().submit(PlanCreate(resources=[]))
+    assert [r.getMessage() for r in _records(caplog)] == ["Kardinal API warning INVALID_VALUE: Amended"]
+
+
 def _fetched(plans):
     respx.get(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
         return_value=httpx.Response(200, json={"item": {"id": _PLAN_ID, "resources": []}})

@@ -109,11 +109,13 @@ class Kardinal:
         self.routing = _Routing(self._transport)
 
     def whoami(self) -> Whoami:
-        """Reports the host this client calls and the agency its API key resolves to.
+        """Reports the host this client calls and the agency its API key
+        resolves to.
 
         It is free, because it makes one read of the plan list.
         It is retried like any read.
-        Compare `agencyId` with your own configuration at startup, to catch a sandbox key where you expect a production one.
+        At startup, compare `agencyId` with your own configuration. This
+        catches a sandbox key where you expect a production one.
         """
         response = self._transport.request(
             "GET", "/plans", params={"page": 1, "itemsPerPage": 1, "archived": "excluded"}

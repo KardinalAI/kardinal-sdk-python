@@ -55,7 +55,7 @@ All methods hang off the client: `k = Kardinal()`.
 | `k.routing.plans.submit(plan)` | `POST /plans` | Creates a plan from a `PlanCreate` (no `id`: the server assigns it) and starts its optimization. Consumes credits. Returns the `Plan`, with `.warnings`. |
 | `k.routing.plans.get(plan_id)` | `GET /plans/{id}` | Returns the plan as currently stored. |
 | `k.routing.plans.update(plan, force=False)` | `PUT /plans/{id}` | Replaces the whole plan (anything left out is removed; fields this SDK version doesn't know, read by `get()`, are kept and sent back). The version increments, and the plan is re-optimized, only if the plan actually changed; an identical update is a free no-op. `force=True` unarchives an archived plan first. |
-| `k.routing.plans.replace(plan_id, plan, force=False)` | `PUT /plans/{id}` | Updates a plan from a new `PlanCreate`, the same object you give `submit()`. You don't copy `id`, `agencyId` or `version`. Anything you leave out is removed, including a field the API gained after this SDK version: use `get()` and `update()` to keep such a field. An identical replace keeps the version and is free. The API doesn't check the version, so the last write wins. `force=True` unarchives an archived plan first. |
+| `k.routing.plans.replace(plan_id, plan, force=False)` | `PUT /plans/{id}` | Updates a plan from a new `PlanCreate`, the same object you give `submit()`, with no `id`, `agencyId` or `version` to copy. Anything you leave out is removed, including a field this SDK version doesn't know: use `get()` and `update()` to keep it. The last write wins. `force=True` unarchives an archived plan first. |
 | `k.whoami()` | `GET /plans` | Returns the host (`baseUrl`) and the agency (`agencyId`) your API key resolves to. It is a read, so it is free. |
 | `k.routing.plans.delete(plan_id)` | `DELETE /plans/{id}` | Permanently deletes the plan and its solution; any optimization in progress is stopped. |
 | `k.routing.plans.list(page=1, items_per_page=20, archived="excluded")` | `GET /plans` | Returns one `Page` of plans, in their light form (`PlanLight`). |
@@ -114,8 +114,8 @@ which of your agencies a call applies to.
 applies to each phase (connecting, sending, each read of the response)
 separately, not to the request as a whole.
 `max_retries` is how many times a read, `update()`, `replace()`, `delete()`,
-`start()` or `stop()` is retried after a network error, a `429` or a `5xx`; `submit()` is
-never retried (see "Good to know" below).
+`start()` or `stop()` is retried after a network error, a `429` or a `5xx`.
+`submit()` is never retried (see "Good to know" below).
 
 The client can be used as a context manager (`with Kardinal() as k:`), or
 closed with `k.close()`.
@@ -128,8 +128,8 @@ first plan is submitted:
 
 ```python
 who = k.whoami()
-print(who.baseUrl, who.agencyId)
-expected_agency = who.agencyId       # in your application: the id from your own configuration
+print(who.baseUrl)
+expected_agency = "A_sandbox"        # read it from your own configuration
 if who.agencyId != expected_agency:
     raise RuntimeError(f"This API key belongs to {who.agencyId}, not to {expected_agency}")
 ```
@@ -332,9 +332,9 @@ except KardinalLimitError as e:
 `KardinalRateLimitError` (429) signals a temporary overload, not a quota: it
 comes with an empty body and, today, no `Retry-After` header — the SDK
 honours one if the API ever sends it, and otherwise backs off on a jittered
-schedule of its own. Reads, `update()`, `replace()`, `delete()`, `start()`, `stop()` and
-`wait()` retry it automatically; `submit()` doesn't, so retry it yourself
-after a pause.
+schedule of its own. Reads, `update()`, `replace()`, `delete()`, `start()`,
+`stop()` and `wait()` retry it automatically. `submit()` doesn't, so retry it
+yourself after a pause.
 
 `.retryable` is computed by the SDK and means "retrying is safe and may
 succeed": true for a `429`, and for a `5xx` or a connection error, except
