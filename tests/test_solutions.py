@@ -96,7 +96,7 @@ def test_wait_returns_soon_after_the_plan_finishes_not_after_its_budget(clock) -
     assert solution.planId == _PLAN_ID
     assert solution.final_state == PlanState.optimized
     assert clock[0] == 20
-    assert states.call_count == 2
+    assert states.call_count == 3  # once at t=0, then at 10s and 20s
     assert solution_route.call_count == 1
 
 
@@ -112,6 +112,68 @@ def test_wait_first_polls_after_ten_seconds_not_immediately(clock) -> None:
 
     solutions.wait(_PLAN_ID)
 
+    assert clock[0] == 10
+
+
+@respx.mock
+def test_wait_after_start_does_not_return_the_previous_runs_optimized(clock) -> None:
+    """Right after `start()`, /state can still show the previous run's
+    `optimized`. The read at t=0 only records it.
+    """
+    _mock_plan()
+    _mock_states(clock, [(0, "optimized", 1), (0.5, "processing", 1), (12, "optimizing", 1), (25, "optimized", 1)])
+    _mock_solution()
+    _, solutions = _apis()
+
+    solution = solutions.wait(_PLAN_ID)
+
+    assert solution.final_state == PlanState.optimized
+    assert clock[0] == 30
+
+
+@respx.mock
+def test_wait_after_start_skips_the_previous_runs_late_interrupted(clock) -> None:
+    """A restart during `optimizing`, as seen in production on 2026-11-04:
+    `processing` at once, the old run's `interrupted` about 1s later, the
+    new run's `optimizing` up to 14s after the restart.
+    """
+    _mock_plan()
+    _mock_states(
+        clock,
+        [(0, "processing", 1), (1, "interrupted", 1), (12, "optimizing", 1), (65, "optimized", 1)],
+    )
+    _mock_solution()
+    _, solutions = _apis()
+
+    solution = solutions.wait(_PLAN_ID)
+
+    assert solution.final_state == PlanState.optimized
+    assert clock[0] == 70
+
+
+@respx.mock
+def test_wait_returns_a_leftover_interrupted_after_a_minute_without_a_new_run(clock) -> None:
+    _mock_plan()
+    _mock_states(clock, [(0, "processing", 1), (1, "interrupted", 1)])
+    _mock_solution()
+    _, solutions = _apis()
+
+    solution = solutions.wait(_PLAN_ID)
+
+    assert solution.final_state == PlanState.interrupted
+    assert 70 <= clock[0] <= 80
+
+
+@respx.mock
+def test_wait_returns_interrupted_at_once_when_it_follows_optimizing(clock) -> None:
+    _mock_plan()
+    _mock_states(clock, [(0, "optimizing", 1), (5, "interrupted", 1)])
+    _mock_solution()
+    _, solutions = _apis()
+
+    solution = solutions.wait(_PLAN_ID)
+
+    assert solution.final_state == PlanState.interrupted
     assert clock[0] == 10
 
 
@@ -319,7 +381,7 @@ def test_wait_checks_the_state_once_more_before_timing_out(clock) -> None:
     solution = solutions.wait(_PLAN_ID, timeout=3)
 
     assert solution.final_state == PlanState.optimized
-    assert states.call_count == 1
+    assert states.call_count == 2  # the read at t=0 never returns
     assert clock[0] == 3
 
 
@@ -333,7 +395,7 @@ def test_wait_raises_timeout_with_the_last_state_seen(clock) -> None:
         solutions.wait(_PLAN_ID, timeout=25)
 
     assert clock[0] == 25
-    assert states.call_count == 3
+    assert states.call_count == 4
 
 
 @respx.mock
@@ -345,7 +407,7 @@ def test_wait_timeout_zero_still_polls_once(clock) -> None:
     with pytest.raises(KardinalTimeoutError):
         solutions.wait(_PLAN_ID, timeout=0)
 
-    assert states.call_count == 1
+    assert states.call_count == 2
 
 
 @respx.mock

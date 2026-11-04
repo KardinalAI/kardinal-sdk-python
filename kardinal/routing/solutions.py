@@ -33,10 +33,16 @@ _STALL_MARGIN_SECONDS = 300.0
 # `stopped` during `optimizing` is followed by `interrupted` once the engine
 # has actually stopped — the solution can still improve in between.
 _STOPPED_GRACE_SECONDS = 60.0
+# A restart during `optimizing` starts a new run on the same version: /state
+# goes `waiting`/`processing`, then shows the old run's `interrupted` (up to
+# 14s in production) before the new run's `optimizing`. An `interrupted` right
+# after a starting state is that leftover, unless it lasts this long.
+_RESTART_GRACE_SECONDS = 60.0
 # 429 here comes from the cluster ("no backend available right now"), not
 # the API: like 5xx and network failures, worth riding out, not surfacing.
 _TRANSIENT_ERRORS = (KardinalRateLimitError, KardinalServerError, KardinalConnectionError)
 _OPTIMIZING_STATES = frozenset({models.PlanState.optimizing, models.PlanState.preOptimizing})
+_STARTING_STATES = frozenset({models.PlanState.waiting, models.PlanState.processing})
 
 
 def _poll_interval(elapsed: float) -> float:
@@ -113,7 +119,12 @@ class SolutionsAPI:
 
         Polls `get_status` every 10s at first, stretching to every 60s on
         long optimizations; transient failures (429, 5xx, network) are
-        ridden out. Meant for scripts and notebooks — a server tracking many
+        ridden out.
+
+        Right after `plans.start()`, it waits for the new run. The run that
+        the restart cut short reports `interrupted` a few seconds later, and
+        `wait()` doesn't stop on it. To see the restart, it reads the state
+        once as soon as it's called. Call it right after `start()`. Meant for scripts and notebooks — a server tracking many
         plans should schedule its own `get_status` calls instead of blocking.
 
         Raises `KardinalOptimizationError` when there's no solution to return
@@ -137,7 +148,13 @@ class SolutionsAPI:
             else None
         )
 
-        tracker = {"state": None, "since": None, "stopped_since": None}
+        tracker = {"state": None, "since": None, "stopped_since": None, "leftover_since": None}
+        try:
+            # Recorded, never returned: right after `start()` this can still
+            # be the previous run's `optimized`.
+            tracker["state"], tracker["since"] = self._plans._get_state(plan_id)[0], start
+        except _TRANSIENT_ERRORS:
+            pass
         while True:
             now = time.monotonic()
             pause = _poll_interval(now - start)
@@ -167,7 +184,8 @@ class SolutionsAPI:
     ) -> Optional[Solution]:
         """One `wait()` poll: the solution if the plan is done, `None` to keep
         waiting, or raises. `tracker` carries what polls need to remember:
-        the last state seen, since when, and since when it has been `stopped`.
+        the last state seen, since when, since when it has been `stopped`,
+        and since when it has shown a restarted run's leftover `interrupted`.
         """
         state, state_version = self._plans._get_state(plan_id)
         if version is not None and state_version is not None:
@@ -180,8 +198,16 @@ class SolutionsAPI:
             if state_version < version:
                 return None  # right after update(): /state hasn't caught up yet
         now = time.monotonic()
-        if state != tracker["state"]:
+        previous = tracker["state"]
+        if state != previous:
             tracker["state"], tracker["since"] = state, now
+        if state != models.PlanState.interrupted:
+            tracker["leftover_since"] = None
+        elif previous in _STARTING_STATES or tracker["leftover_since"] is not None:
+            if tracker["leftover_since"] is None:
+                tracker["leftover_since"] = now
+            if now - tracker["leftover_since"] < _RESTART_GRACE_SECONDS:
+                return None
 
         if state == models.PlanState.deleted:
             raise self._deleted(plan_id)
