@@ -140,9 +140,10 @@ The docs repository's CI runs `scripts/sync_doc_examples.py`,
 from this repository's `main` against its pages and the PyPI package. Keep
 those names, and keep those files working with the latest release.
 
-A new docs page with Python blocks needs its `EXPECTED` entry here first.
-Merge it before the docs merge request: an entry without a page is allowed,
-while a page without an entry fails the test.
+A new doc page with Python blocks needs its entry in `EXPECTED` (in
+`tests/test_doc_examples.py`) first. Merge that entry before the docs merge
+request. The test accepts an entry with no page yet, and fails on a page with
+no entry.
 
 ### Code generation notes
 
