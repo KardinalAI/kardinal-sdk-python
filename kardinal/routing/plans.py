@@ -262,7 +262,8 @@ class PlansAPI:
 
     def get(self, plan_id: str) -> Plan:
         """`GET /plans/{id}`. The plan as currently stored. Never carries
-        warnings: they're only returned by `submit()`/`update()`.
+        warnings: they're only returned by `submit()`, `update()` and
+        `replace()`.
         """
         response = self._transport.request("GET", f"/plans/{plan_id}")
         return _plan_from_envelope(response)
