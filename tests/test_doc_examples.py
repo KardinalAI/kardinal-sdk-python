@@ -6,6 +6,7 @@ tests/fake_api.py.
 Running is not enough: `if state == "optimized":` runs fine and is simply
 never true. So each page also has a few expected values below, checked after
 its blocks ran. A page with blocks but no entry in EXPECTED fails the test.
+An entry with no page yet is allowed, so it can merge before the docs page.
 """
 
 import re
@@ -182,7 +183,7 @@ def _pages():
 def test_every_page_with_examples_has_expected_values() -> None:
     pages = {p.stem for p in _pages()}
     assert pages, "tests/doc_examples/ is empty: run scripts/sync_doc_examples.py"
-    assert pages == set(EXPECTED), f"pages and EXPECTED differ: {sorted(pages ^ set(EXPECTED))}"
+    assert pages <= set(EXPECTED), f"pages with no entry in EXPECTED: {sorted(pages - set(EXPECTED))}"
 
 
 @respx.mock

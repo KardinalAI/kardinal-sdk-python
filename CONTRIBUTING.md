@@ -135,6 +135,15 @@ change in any release; the TypeScript SDK follows the same rule. It copies the
 same blocks with its own script (`scripts/sync-doc-examples.mjs`) into
 `tests/case-studies/`.
 
+The docs repository's CI runs `scripts/sync_doc_examples.py`,
+`tests/test_doc_examples.py`, `tests/fake_api.py` and `tests/conftest.py`
+from this repository's `main` against its pages and the PyPI package. Keep
+those names, and keep those files working with the latest release.
+
+A new docs page with Python blocks needs its `EXPECTED` entry here first.
+Merge it before the docs merge request: an entry without a page is allowed,
+while a page without an entry fails the test.
+
 ### Code generation notes
 
 - `scripts/generate_models.sh` passes `--disable-timestamp`:
