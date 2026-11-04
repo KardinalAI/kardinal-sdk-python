@@ -4,7 +4,11 @@ import httpx
 import pytest
 import respx
 
-from kardinal._core.errors import KardinalConnectionError, KardinalNotFoundError
+from kardinal._core.errors import (
+    KardinalConnectionError,
+    KardinalNotFoundError,
+    UnknownFieldError,
+)
 from kardinal._core.transport import DEFAULT_BASE_URL, Transport
 from kardinal.routing import models
 from kardinal.routing._annotations import unknown_fields
@@ -179,6 +183,50 @@ def test_update_sends_force_as_a_query_param() -> None:
     )
     _plans().update(Plan(id=_PLAN_ID, resources=[]), force=True)
     assert route.calls.last.request.url.params["force"] == "true"
+
+
+def _replace_route() -> respx.Route:
+    return respx.put(f"{DEFAULT_BASE_URL}/plans/{_PLAN_ID}").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "item": {"id": _PLAN_ID, "resources": [], "version": 2},
+                "warnings": [{"code": "INVALID_VALUE", "message": "clamped"}],
+            },
+        )
+    )
+
+
+@respx.mock
+def test_replace_sends_the_body_submit_sends_without_read_only_fields() -> None:
+    route = _replace_route()
+    create = PlanCreate(resources=[], tz="Europe/Paris")
+    plan = _plans().replace(_PLAN_ID, create)
+    request = route.calls.last.request
+    assert request.url.params["force"] == "false"
+    sent = json.loads(request.content)
+    assert sent == create.model_dump(mode="json", exclude_none=True)
+    assert not {"id", "agencyId", "version"} & sent.keys()
+    assert plan.id == _PLAN_ID
+    assert plan.warnings[0].code.value == "INVALID_VALUE"
+
+
+@respx.mock
+def test_replace_sends_force_as_a_query_param() -> None:
+    route = _replace_route()
+    _plans().replace(_PLAN_ID, PlanCreate(resources=[]), force=True)
+    assert route.calls.last.request.url.params["force"] == "true"
+
+
+@respx.mock
+def test_replace_checks_unknown_fields_before_any_request() -> None:
+    route = _replace_route()
+    create = PlanCreate.model_validate({"resources": [], "aNewApiField": 1})
+    with pytest.raises(UnknownFieldError):
+        _plans().replace(_PLAN_ID, create)
+    assert not route.called
+    _plans().replace(_PLAN_ID, create, allow_unknown=["aNewApiField"])
+    assert json.loads(route.calls.last.request.content)["aNewApiField"] == 1
 
 
 @respx.mock

@@ -1,5 +1,5 @@
-"""`k.routing.plans`: submit, get, update, delete, list/iter_all, start,
-stop, get_status — plus the hand-written `PlanCreate`/`Plan` that
+"""`k.routing.plans`: submit, get, update, replace, delete, list/iter_all,
+start, stop, get_status — plus the hand-written `PlanCreate`/`Plan` that
 the single generated `Plan` schema can't provide on its own.
 """
 
@@ -182,9 +182,20 @@ def _plan_from_envelope(response: Dict[str, Any]) -> Plan:
     return plan
 
 
+def _create_body(plan: PlanCreate, allow_unknown: Collection[str]) -> Dict[str, Any]:
+    """The request body of `submit()` and `replace()`. Refuses an unknown
+    field that `allow_unknown` doesn't name.
+    """
+    allowed = _allowed(allow_unknown)
+    unknown = [f for f in _annotations.unknown_fields(plan) if f.key not in allowed]
+    if unknown:
+        raise UnknownFieldError(unknown)
+    return plan.model_dump(mode="json", exclude_none=True)
+
+
 class PlansAPI:
-    """`k.routing.plans`: submit, get, update, delete, list/iter_all, start,
-    stop, get_status.
+    """`k.routing.plans`: submit, get, update, replace, delete, list/iter_all,
+    start, stop, get_status.
     """
 
     def __init__(self, transport: Transport) -> None:
@@ -203,11 +214,7 @@ class PlansAPI:
         the one you had in mind: unlike provenance, which is recorded per
         model type, this matches the key alone.
         """
-        allowed = _allowed(allow_unknown)
-        unknown = [f for f in _annotations.unknown_fields(plan) if f.key not in allowed]
-        if unknown:
-            raise UnknownFieldError(unknown)
-        body = plan.model_dump(mode="json", exclude_none=True)
+        body = _create_body(plan, allow_unknown)
         response = self._transport.request("POST", "/plans", json=body)
         return _plan_from_envelope(response)
 
@@ -280,6 +287,39 @@ class PlansAPI:
         )
         response = self._transport.request(
             "PUT", f"/plans/{plan.id}", json=body, params={"force": force}
+        )
+        return _plan_from_envelope(response)
+
+    def replace(
+        self,
+        plan_id: str,
+        plan: PlanCreate,
+        *,
+        force: bool = False,
+        allow_unknown: Collection[str] = (),
+    ) -> Plan:
+        """`PUT /plans/{id}`. Replaces the stored plan with a new `PlanCreate`,
+        without copying `id`, `agencyId` and `version` from a fetched plan.
+
+        It is a full replacement, like `update()`. Anything you leave out is
+        removed, including a field the API gained after this SDK version.
+        To keep such a field, use `get()` and `update()` instead.
+
+        It sends the same body as `submit()`. An identical plan is a free
+        no-op that returns the same version, so a plan created by either SDK
+        stays unchanged. A plan created from raw JSON, without the defaults
+        this SDK fills in (`priority`, `lateDeparture`, `sharedCapacities`),
+        gets one new version the first time, and then stays stable.
+
+        There is no version check: the last write wins.
+
+        `force` unarchives the plan first if it's archived; ignored otherwise.
+        An unknown field raises `UnknownFieldError`, as in `submit()`.
+        Retried like `update()`.
+        """
+        body = _create_body(plan, allow_unknown)
+        response = self._transport.request(
+            "PUT", f"/plans/{plan_id}", json=body, params={"force": force}
         )
         return _plan_from_envelope(response)
 
