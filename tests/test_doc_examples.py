@@ -126,6 +126,21 @@ def _skills(ns, out):
     assert "tech-plain lacks ['gas-certified']" in out, out
 
 
+def _multi_day(ns, out):
+    assert len(ns["plan"].orders) == 4
+    assert len(ns["truck"].breaks) == 2
+    # The guide's night check: a rest between two days passes, a missing one is reported.
+    tour = {"wayPoints": [
+        {"type": "stop", "arrivalTime": "2026-11-09T15:00:00+01:00"},
+        {"type": "break", "arrivalTime": "2026-11-09T19:00:00+01:00", "departureTime": "2026-11-10T06:00:00+01:00",
+         "fromPrevious": {"travelDuration": "PT0S"}},
+        {"type": "stop", "arrivalTime": "2026-11-10T11:00:00+01:00"},
+    ]}
+    assert ns["check_nights"](tour, "Europe/Paris") == []
+    del tour["wayPoints"][1]
+    assert ns["check_nights"](tour, "Europe/Paris"), "a night without rest was not reported"
+
+
 # Page (path without .mdx, "/" as "__") -> checks run on its namespace and
 # on what its blocks printed.
 EXPECTED = {
@@ -135,6 +150,7 @@ EXPECTED = {
     "sdks__building-plans": _building_plans,
     "sdks__errors-and-warnings": _errors_and_warnings,
     "guides__breaks": _breaks,
+    "guides__multi-day": _multi_day,
     "guides__time-windows": _time_windows,
     "guides__skills-and-assignments": _skills,
     "guides__orders-and-sequences": _orders,
