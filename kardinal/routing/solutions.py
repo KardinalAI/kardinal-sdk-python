@@ -148,7 +148,7 @@ class SolutionsAPI:
             else None
         )
 
-        tracker = {"state": None, "since": None, "stopped_since": None, "leftover_since": None}
+        tracker: dict = {"state": None, "since": None, "stopped_since": None, "leftover_since": None}
         try:
             # Recorded, never returned: right after `start()` this can still
             # be the previous run's `optimized`.
