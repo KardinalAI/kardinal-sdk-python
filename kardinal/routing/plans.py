@@ -5,6 +5,7 @@ the single generated `Plan` schema can't provide on its own.
 
 from __future__ import annotations
 
+import logging
 import warnings
 
 from typing import Annotated, Any, Collection, Dict, Iterator, List, Literal, Optional, Tuple, Union
@@ -182,6 +183,33 @@ def _plan_from_envelope(response: Dict[str, Any]) -> Plan:
     return plan
 
 
+def _log_api_warnings(api_warnings: List[models.Warning]) -> None:
+    """Logs the warnings of a `POST`/`PUT` response on the `kardinal` logger,
+    one `WARNING` line per kind of warning (same `code` and `details`), with
+    up to three of the paths it concerns. `plan.warnings` keeps them all.
+    """
+    groups: Dict[Tuple[str, str], List[str]] = {}
+    for warning in api_warnings:
+        properties = warning.properties or {}
+        key = (warning.code.value, properties.get("details") or warning.message)
+        paths = groups.setdefault(key, [])
+        if "path" in properties:
+            paths.append(properties["path"])
+    for (code, text), paths in groups.items():
+        line = f"Kardinal API warning {code}: {text}"
+        if paths:
+            shown = paths[:3] + ([f"and {len(paths) - 3} more"] if len(paths) > 3 else [])
+            line += f" ({', '.join(shown)})"
+        # WHY: the logger is fetched here, at the moment of logging, and not
+        # once at module level. A logger created when this module is imported
+        # exists before the application configures logging, and
+        # `logging.config.dictConfig` disables every existing logger it does
+        # not name, so the line would vanish in a typical web application.
+        # There is no `NullHandler` either: it would stop Python's fallback
+        # handler from printing the line when nothing was configured.
+        logging.getLogger("kardinal").warning(line)
+
+
 def _create_body(plan: PlanCreate, allow_unknown: Collection[str]) -> Dict[str, Any]:
     """The request body of `submit()` and `replace()`. Refuses an unknown
     field that `allow_unknown` doesn't name.
@@ -201,6 +229,13 @@ class PlansAPI:
     def __init__(self, transport: Transport) -> None:
         self._transport = transport
 
+    @staticmethod
+    def _read_amended(response: Dict[str, Any]) -> Plan:
+        """`_plan_from_envelope`, then logs the warnings of the response."""
+        plan = _plan_from_envelope(response)
+        _log_api_warnings(plan.warnings)
+        return plan
+
     def submit(self, plan: PlanCreate, *, allow_unknown: Collection[str] = ()) -> Plan:
         """`POST /plans`. Creates a new plan and starts optimization —
         billed in full. The server assigns `id`.
@@ -216,7 +251,7 @@ class PlansAPI:
         """
         body = _create_body(plan, allow_unknown)
         response = self._transport.request("POST", "/plans", json=body)
-        return _plan_from_envelope(response)
+        return self._read_amended(response)
 
     def get(self, plan_id: str) -> Plan:
         """`GET /plans/{id}`. The plan as currently stored. Never carries
@@ -288,7 +323,7 @@ class PlansAPI:
         response = self._transport.request(
             "PUT", f"/plans/{plan.id}", json=body, params={"force": force}
         )
-        return _plan_from_envelope(response)
+        return self._read_amended(response)
 
     def replace(
         self,
@@ -321,7 +356,7 @@ class PlansAPI:
         response = self._transport.request(
             "PUT", f"/plans/{plan_id}", json=body, params={"force": force}
         )
-        return _plan_from_envelope(response)
+        return self._read_amended(response)
 
     def delete(self, plan_id: str) -> None:
         """`DELETE /plans/{id}`. Permanently deletes the plan and its
