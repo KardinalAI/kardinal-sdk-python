@@ -86,7 +86,12 @@ class FakeApi:
     def list(self, request):
         light = {"id": PLAN_ID, "version": (self.plan or {}).get("version", 1), "state": "optimized"}
         return httpx.Response(
-            200, json={"items": [light], "paging": {"page": 1, "totalPages": 1, "total": 1}}
+            200,
+            json={
+                "agencyId": "A_sandbox",
+                "items": [light],
+                "paging": {"page": 1, "totalPages": 1, "total": 1},
+            },
         )
 
 

@@ -55,6 +55,8 @@ All methods hang off the client: `k = Kardinal()`.
 | `k.routing.plans.submit(plan)` | `POST /plans` | Creates a plan from a `PlanCreate` (no `id`: the server assigns it) and starts its optimization. Consumes credits. Returns the `Plan`, with `.warnings`. |
 | `k.routing.plans.get(plan_id)` | `GET /plans/{id}` | Returns the plan as currently stored. |
 | `k.routing.plans.update(plan, force=False)` | `PUT /plans/{id}` | Replaces the whole plan (anything left out is removed; fields this SDK version doesn't know, read by `get()`, are kept and sent back). The version increments, and the plan is re-optimized, only if the plan actually changed; an identical update is a free no-op. `force=True` unarchives an archived plan first. |
+| `k.routing.plans.replace(plan_id, plan, force=False)` | `PUT /plans/{id}` | Updates a plan from a new `PlanCreate`, the same object you give `submit()`. You don't copy `id`, `agencyId` or `version`. Anything you leave out is removed, including a field the API gained after this SDK version: use `get()` and `update()` to keep such a field. An identical replace keeps the version and is free. The API doesn't check the version, so the last write wins. `force=True` unarchives an archived plan first. |
+| `k.whoami()` | `GET /plans` | Returns the host (`baseUrl`) and the agency (`agencyId`) your API key resolves to. It is a read, so it is free. |
 | `k.routing.plans.delete(plan_id)` | `DELETE /plans/{id}` | Permanently deletes the plan and its solution; any optimization in progress is stopped. |
 | `k.routing.plans.list(page=1, items_per_page=20, archived="excluded")` | `GET /plans` | Returns one `Page` of plans, in their light form (`PlanLight`). |
 | `k.routing.plans.iter_all(archived="excluded")` | `GET /plans`, every page | Iterates over every plan. |
@@ -111,12 +113,28 @@ which of your agencies a call applies to.
 `timeout` (seconds) is passed to `httpx` as each request's timeout, which
 applies to each phase (connecting, sending, each read of the response)
 separately, not to the request as a whole.
-`max_retries` is how many times a read, `update()`, `delete()`, `start()` or
-`stop()` is retried after a network error, a `429` or a `5xx`; `submit()` is
+`max_retries` is how many times a read, `update()`, `replace()`, `delete()`,
+`start()` or `stop()` is retried after a network error, a `429` or a `5xx`; `submit()` is
 never retried (see "Good to know" below).
 
 The client can be used as a context manager (`with Kardinal() as k:`), or
 closed with `k.close()`.
+
+### Check the agency at startup
+
+A sandbox key and a production key can look alike. `whoami()` tells you which
+host and which agency your key resolves to, so you can check it before the
+first plan is submitted:
+
+```python
+who = k.whoami()
+print(who.baseUrl, who.agencyId)
+expected_agency = who.agencyId       # in your application: the id from your own configuration
+if who.agencyId != expected_agency:
+    raise RuntimeError(f"This API key belongs to {who.agencyId}, not to {expected_agency}")
+```
+
+`agencyId` is `None` when the API doesn't return one.
 
 ## Full walkthrough
 
@@ -187,7 +205,15 @@ plan.orders.append(
         position=models.Position(lat=48.86, lon=2.35))])
 )
 plan = k.routing.plans.update(plan)
+
+# or send a new PlanCreate for the same plan: no id, agencyId or version to copy
+plan = k.routing.plans.replace(plan.id, plan_input)
 ```
+
+`replace()` sends the same body as `submit()`. A plan created by either SDK
+keeps its version when you replace it with the same `PlanCreate`. A plan
+created from raw JSON, without the SDK's default values, gets one extra
+version on its first `replace()`. Later identical calls keep that version.
 
 A plan has no top-level list of stops: stops live inside `Order.stops[]`,
 and `Plan.orders[]` is the list of orders. An `Order` groups one or more
@@ -306,7 +332,7 @@ except KardinalLimitError as e:
 `KardinalRateLimitError` (429) signals a temporary overload, not a quota: it
 comes with an empty body and, today, no `Retry-After` header — the SDK
 honours one if the API ever sends it, and otherwise backs off on a jittered
-schedule of its own. Reads, `update()`, `delete()`, `start()`, `stop()` and
+schedule of its own. Reads, `update()`, `replace()`, `delete()`, `start()`, `stop()` and
 `wait()` retry it automatically; `submit()` doesn't, so retry it yourself
 after a pause.
 
@@ -322,8 +348,8 @@ that rejected it was found.
 
 ## Warnings
 
-When the API accepts a plan but amends part of it, `submit()` and
-`update()` return the amendments in `.warnings`:
+When the API accepts a plan but amends part of it, `submit()`, `update()` and
+`replace()` return the amendments in `.warnings`:
 
 ```python
 plan = k.routing.plans.submit(plan_input)
@@ -334,10 +360,36 @@ for warning in plan.warnings:
 Read them from that return value: warnings aren't stored with the plan, so
 a later `get()` never returns them, only the amended value.
 
+The same three methods also log each kind of warning once, on the `kardinal`
+logger at the `WARNING` level. You need no logging setup to see the line:
+Python prints it on stderr. A line looks like this:
+
+```
+Kardinal API warning INVALID_VALUE: The crowfly mode is forced for agency A_sandbox (resources.0.vehicleProfile, resources.1.vehicleProfile)
+```
+
+The sandbox sends the crow-fly warning once per vehicle. The SDK groups them
+in one line and lists the first three paths. To silence the lines, raise the
+level of the logger:
+
+```python
+import logging
+
+logging.getLogger("kardinal").setLevel(logging.ERROR)
+```
+
+The wording of the line is for people and may change in a later release.
+A program should read `plan.warnings`. When the API rejects a plan, its
+warnings come with the exception, and the SDK doesn't log them.
+
+If your application calls `logging.config.dictConfig` after the first
+warning, set `disable_existing_loggers` to `False` in that configuration.
+Otherwise `dictConfig` disables the `kardinal` logger.
+
 ## The CLI
 
 ```
-kardinal auth check                    confirms the API key works, and shows its host and agency
+kardinal auth check                    confirms the API key works, and shows its host and agency (what `k.whoami()` returns)
 kardinal version
 
 kardinal routing plans submit <file> | get <id> | update <file> | delete <id>
@@ -363,11 +415,11 @@ never lands in shell history or the process list. `solutions wait` takes
 
 - **`submit()` is never retried automatically**, not even after a network
   error or a `5xx`: the API has no idempotency key, so a retry could create
-  the plan twice. Reads, `update()`, `delete()`, `start()` and `stop()` are
-  retried. Replaying the same `update()` is harmless: an identical update
+  the plan twice. Reads, `update()`, `replace()`, `delete()`, `start()` and
+  `stop()` are retried. Replaying the same `update()` is harmless: an identical update
   keeps the same version and isn't billed.
 - **`maxOptimizationDuration` is capped by your agency.** A value above the
-  cap is clamped to it, and `submit()`/`update()` report it in `.warnings`.
+  cap is clamped to it, and `submit()`/`update()`/`replace()` report it in `.warnings`.
   By default: 5 seconds in the sandbox (also the default when omitted); in
   production, 15 minutes when omitted and 6 hours at most. The engine stops
   earlier on its own once it stops finding improvements.
