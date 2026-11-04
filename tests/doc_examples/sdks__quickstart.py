@@ -12,4 +12,8 @@ solution = k.routing.solutions.wait(plan.id)  # returns in about 20 seconds
 # --- sdks/quickstart.mdx:72
 print(solution.final_state)  # optimized, or interrupted/stopped if cut short
 for tour in solution.tours or []:  # tours is None when no stop could be planned
-    print(tour.resourceId, len(tour.wayPoints))
+    print(tour.resourceId)
+    for wp in tour.wayPoints or []:
+        if wp.type == "stop":
+            print(wp.stopId, wp.arrivalTime, wp.beginTime)
+print("Not planned:", solution.unaffectedStopIds or [])

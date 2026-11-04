@@ -95,6 +95,12 @@ def _resource_limits(ns, out):
 
 def _quickstart(ns, out):
     assert ns["solution"].final_state == "optimized"
+    lines = out.splitlines()
+    assert any(
+        "stop-1" in line and "2026-10-29T09:50:00+01:00" in line and "2026-10-29T10:00:00+01:00" in line
+        for line in lines
+    ), out
+    assert any(line.startswith("Not planned:") for line in lines), out
 
 
 def _configuration(ns, out):

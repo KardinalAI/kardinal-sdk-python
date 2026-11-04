@@ -1,6 +1,6 @@
 """The simulated Kardinal API shared by the tests that run published
 examples (the README, the doc pages): it echoes submitted plans back and
-reports every plan as optimized with a one-tour solution.
+reports every plan as optimized with a one-tour, one-stop solution.
 """
 
 import json
@@ -33,7 +33,7 @@ PLAN_SIZE_LIMIT = [
 
 class FakeApi:
     """Echoes submitted plans back with an id and a version, like the API,
-    and reports every plan as optimized with a one-tour solution.
+    and reports every plan as optimized with a one-tour, one-stop solution.
     """
 
     def __init__(self):
@@ -59,7 +59,19 @@ class FakeApi:
         )
 
     def solution(self, request):
-        tour = {"resourceId": self.plan["resources"][0]["id"], "wayPoints": []}
+        position = {"lat": 48.85, "lon": 2.35}
+        stop = {
+            "type": "stop",
+            "stopId": "stop-1",
+            "arrivalTime": "2026-10-29T09:50:00+01:00",
+            "beginTime": "2026-10-29T10:00:00+01:00",
+            "delay": "PT0S",
+            "position": position,
+        }
+        tour = {
+            "resourceId": self.plan["resources"][0]["id"],
+            "wayPoints": [{"type": "begin", "position": position}, stop, {"type": "end", "position": position}],
+        }
         return httpx.Response(
             200,
             json={"item": {"planId": PLAN_ID, "planVersion": self.plan["version"], "tours": [tour]}},
