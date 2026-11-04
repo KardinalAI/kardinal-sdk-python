@@ -6,7 +6,7 @@ from kardinal.routing import examples
 
 k = Kardinal()  # reads KARDINAL_API_KEY
 plan = k.routing.plans.submit(examples.small_delivery_plan())
-solution = k.routing.solutions.wait(plan.id)  # returns in about 20 seconds
+solution = k.routing.solutions.wait(plan.id, timeout=60)  # returns in about 20 seconds
 
 
 # --- sdks/quickstart.mdx:72

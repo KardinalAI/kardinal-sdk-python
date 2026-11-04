@@ -11,13 +11,13 @@ for warning in plan.warnings:
     print(warning.code, warning.properties)
 
 
-# --- sdks/plan-lifecycle.mdx:44
-solution = k.routing.solutions.wait(plan.id)            # no time limit
-solution = k.routing.solutions.wait(plan.id, timeout=600)  # at most 10 minutes
+# --- sdks/plan-lifecycle.mdx:46
+solution = k.routing.solutions.wait(plan.id, timeout=60)    # sandbox: about one minute
+solution = k.routing.solutions.wait(plan.id, timeout=1800)  # production: 30 minutes; raise it if you raise maxOptimizationDuration
 print(solution.final_state)
 
 
-# --- sdks/plan-lifecycle.mdx:71
+# --- sdks/plan-lifecycle.mdx:73
 from kardinal.routing import models
 
 state = k.routing.plans.get_status(plan.id)  # waiting, processing, optimizing, optimized, ...
@@ -26,7 +26,7 @@ if state == models.PlanState.optimized:
 objectives = k.routing.solutions.get_objectives(plan.id)  # objective values only
 
 
-# --- sdks/plan-lifecycle.mdx:119
+# --- sdks/plan-lifecycle.mdx:121
 from kardinal.routing import models
 from kardinal.routing.plans import Order
 
@@ -38,15 +38,15 @@ plan.orders.append(
     )
 )
 plan = k.routing.plans.update(plan)  # same id, new version
-solution = k.routing.solutions.wait(plan.id)
+solution = k.routing.solutions.wait(plan.id, timeout=60)  # sandbox value; in production, allow more than the plan's maxOptimizationDuration
 
 
-# --- sdks/plan-lifecycle.mdx:155
+# --- sdks/plan-lifecycle.mdx:157
 k.routing.plans.stop(plan.id)   # stop the optimization in progress
 k.routing.plans.start(plan.id)  # restart it, on the same version
 
 
-# --- sdks/plan-lifecycle.mdx:173
+# --- sdks/plan-lifecycle.mdx:175
 page = k.routing.plans.list(page=1, items_per_page=20)
 print(page.total, page.total_pages, page.next_page)
 
@@ -54,5 +54,5 @@ for light_plan in k.routing.plans.iter_all():  # every page, one plan at a time
     print(light_plan.id, light_plan.state)
 
 
-# --- sdks/plan-lifecycle.mdx:199
+# --- sdks/plan-lifecycle.mdx:201
 k.routing.plans.delete(plan.id)
