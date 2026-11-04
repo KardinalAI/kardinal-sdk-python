@@ -346,6 +346,7 @@ class PlansAPI:
         It is a full replacement, like `update()`. Anything you leave out is
         removed, including a field the API gained after this SDK version.
         To keep such a field, use `get()` and `update()` instead.
+        A plan you read with `get()` raises `TypeError`, before any request.
 
         It sends the same body as `submit()`. An identical plan is a free
         no-op that returns the same version, so a plan created by either SDK
@@ -359,6 +360,11 @@ class PlansAPI:
         An unknown field raises `UnknownFieldError`, as in `submit()`.
         Retried like `update()`.
         """
+        if isinstance(plan, Plan):
+            raise TypeError(
+                "replace() takes a PlanCreate. "
+                "To send back a plan you read with get(), use update()."
+            )
         body = _create_body(plan, allow_unknown)
         response = self._transport.request(
             "PUT", f"/plans/{plan_id}", json=body, params={"force": force}

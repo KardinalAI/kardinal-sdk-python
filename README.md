@@ -214,6 +214,7 @@ plan = k.routing.plans.replace(plan.id, plan_input)
 keeps its version when you replace it with the same `PlanCreate`. A plan
 created from raw JSON, without the SDK's default values, gets one extra
 version on its first `replace()`. Later identical calls keep that version.
+`replace()` refuses a plan you read with `get()` with a `TypeError`. Send that plan back with `update()`.
 
 A plan has no top-level list of stops: stops live inside `Order.stops[]`,
 and `Plan.orders[]` is the list of orders. An `Order` groups one or more

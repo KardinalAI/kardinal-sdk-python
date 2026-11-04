@@ -230,6 +230,15 @@ def test_replace_checks_unknown_fields_before_any_request() -> None:
 
 
 @respx.mock
+def test_replace_refuses_a_plan_read_with_get_before_any_request() -> None:
+    route = _replace_route()
+    fetched = Plan(id=_PLAN_ID, resources=[], version=1)
+    with pytest.raises(TypeError, match="use update"):
+        _plans().replace(_PLAN_ID, fetched)  # type: ignore[arg-type]
+    assert not route.called
+
+
+@respx.mock
 def test_start_and_stop_send_force_as_a_query_param() -> None:
     route = respx.put(f"{DEFAULT_BASE_URL}/plans/p1/running").mock(
         return_value=httpx.Response(200, json={"planId": "p1", "planVersion": 1})
