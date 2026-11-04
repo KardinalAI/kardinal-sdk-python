@@ -175,6 +175,20 @@ def test_init_skill_cites_the_pitfalls_the_docs_and_the_version(tmp_path, monkey
     assert "https://developers.kardinal.ai/getting-started/agent-modeling-checklist" in text
     assert sdk_version() in text
     assert "{version}" not in text
+    paths_line = (
+        "- Integrating Kardinal into an application? Start with Integration paths. "
+        "It lists the sections to read, in order: "
+        "https://developers.kardinal.ai/getting-started/integration-paths"
+    )
+    checklist_line = (
+        "- Start here if you're an AI agent (the modeling rules that Integration paths "
+        "sends you to first): "
+        "https://developers.kardinal.ai/getting-started/agent-modeling-checklist"
+    )
+    llms_line = "- Every page of the docs, for an agent: https://developers.kardinal.ai/llms.txt"
+    for line in (paths_line, checklist_line, llms_line):
+        assert line in text
+    assert text.index(paths_line) < text.index(checklist_line)
 
 
 @respx.mock

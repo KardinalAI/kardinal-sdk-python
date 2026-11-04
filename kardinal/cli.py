@@ -84,8 +84,9 @@ print("left out:", solution.unaffectedStopIds or [])
 
 ## Documentation
 
+- Integrating Kardinal into an application? Start with Integration paths. It lists the sections to read, in order: https://developers.kardinal.ai/getting-started/integration-paths
+- Start here if you're an AI agent (the modeling rules that Integration paths sends you to first): https://developers.kardinal.ai/getting-started/agent-modeling-checklist
 - Every page of the docs, for an agent: https://developers.kardinal.ai/llms.txt
-- Start here if you're an AI agent: https://developers.kardinal.ai/getting-started/agent-modeling-checklist
 - This SDK: https://developers.kardinal.ai/sdks/quickstart, or run `kardinal --help`.
 """
 
