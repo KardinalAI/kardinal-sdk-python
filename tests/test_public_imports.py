@@ -34,6 +34,13 @@ def test_public_names_are_exported_from_the_package_root() -> None:
         assert name in kardinal.__all__
 
 
+def test_whoami_is_exported_from_the_package_root() -> None:
+    from kardinal import Whoami
+
+    assert "Whoami" in kardinal.__all__
+    assert Whoami.__name__ == "Whoami"
+
+
 def test_every_exception_class_in_core_is_exported() -> None:
     defined = {
         name

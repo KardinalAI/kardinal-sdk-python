@@ -36,17 +36,14 @@ def auth_check(json_out: bool = typer.Option(False, "--json", help="Force JSON o
     """
     try:
         with cli_client() as client:
-            response = client._transport.request(
-                "GET", "/plans", params={"page": 1, "itemsPerPage": 1, "archived": "excluded"}
-            )
-            base_url = client._transport.base_url
+            who = client.whoami()
     except KardinalError as exc:
         fail(exc)
     emit(
         {
             "valid": True,
-            "baseUrl": base_url,
-            "agencyId": response.get("agencyId"),
+            "baseUrl": who.baseUrl,
+            "agencyId": who.agencyId,
         },
         force_json=json_out,
     )

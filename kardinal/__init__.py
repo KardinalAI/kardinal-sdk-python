@@ -5,6 +5,8 @@ from __future__ import annotations
 from types import TracebackType
 from typing import TYPE_CHECKING, Optional, Type
 
+from pydantic import BaseModel
+
 from ._core.auth import EmptyApiKeyError, MissingApiKeyError, resolve_api_key
 from ._core.errors import (
     KardinalAuthError,
@@ -31,6 +33,7 @@ if TYPE_CHECKING:
 __all__ = [
     "Kardinal",
     "Page",
+    "Whoami",
     "KardinalError",
     "KardinalAuthError",
     "KardinalLimitError",
@@ -47,6 +50,13 @@ __all__ = [
     "MissingApiKeyError",
     "EmptyApiKeyError",
 ]
+
+
+class Whoami(BaseModel):
+    """The host and the agency that an API key resolves to."""
+
+    baseUrl: str
+    agencyId: Optional[str] = None
 
 
 class _Routing:
@@ -97,6 +107,18 @@ class Kardinal:
             max_retries=max_retries,
         )
         self.routing = _Routing(self._transport)
+
+    def whoami(self) -> Whoami:
+        """Reports the host this client calls and the agency its API key resolves to.
+
+        It is free, because it makes one read of the plan list.
+        It is retried like any read.
+        Compare `agencyId` with your own configuration at startup, to catch a sandbox key where you expect a production one.
+        """
+        response = self._transport.request(
+            "GET", "/plans", params={"page": 1, "itemsPerPage": 1, "archived": "excluded"}
+        )
+        return Whoami(baseUrl=self._transport.base_url, agencyId=response.get("agencyId"))
 
     def close(self) -> None:
         """Closes the underlying `httpx` connection pool. Idempotent; any
