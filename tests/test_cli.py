@@ -145,6 +145,13 @@ def test_init_writes_the_skill_where_claude_code_loads_it(tmp_path, monkeypatch)
     assert "/reload-skills" in result.stdout
 
 
+def test_init_writes_the_same_skill_where_codex_and_vibe_load_it(tmp_path, monkeypatch) -> None:
+    result, written = _init_skill(tmp_path, monkeypatch)
+    agents_copy = tmp_path / ".agents/skills/kardinal-python/SKILL.md"
+    assert agents_copy.read_text() == written.read_text()
+    assert str(agents_copy.resolve()) in result.stdout.replace("\n", "")
+
+
 def test_init_skill_has_a_valid_front_matter_at_the_first_line(tmp_path, monkeypatch) -> None:
     _, written = _init_skill(tmp_path, monkeypatch)
     text = written.read_text()

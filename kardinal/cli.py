@@ -90,13 +90,16 @@ print("left out:", solution.unaffectedStopIds or [])
 
 @app.command("init")
 def init() -> None:
-    """Write a Claude Code skill for this SDK (.claude/skills/kardinal-python/SKILL.md):
-    run it at the repository root.
+    """Write a skill for this SDK where coding agents load it: .claude/skills/kardinal-python/SKILL.md
+    (Claude Code) and .agents/skills/kardinal-python/SKILL.md (Codex, Mistral Vibe). Run it at the
+    repository root.
     """
-    target = Path(".claude/skills/kardinal-python/SKILL.md")
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(_SKILL.replace("{version}", sdk_version()))
-    typer.echo(f"Wrote {target.resolve()}")
+    # WHY: Claude Code reads only .claude/skills, and Codex and Mistral Vibe read .agents/skills.
+    for folder in (".claude", ".agents"):
+        target = Path(folder, "skills/kardinal-python/SKILL.md")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(_SKILL.replace("{version}", sdk_version()))
+        typer.echo(f"Wrote {target.resolve()}")
     typer.echo("In a running Claude Code session, run /reload-skills to load it.")
     if Path(".kardinal/SKILL.md").exists():
         typer.echo(".kardinal/SKILL.md is no longer written by `kardinal init`: it can be deleted.")
