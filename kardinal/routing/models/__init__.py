@@ -122,7 +122,7 @@ class StopKind(str, Enum):
     """
     Generic operation label from the resource's own point of view. It sets how the stop's `capacities` affect the resource's load: added for `pickup`, deducted for `delivery`, ignored for `acknowledgement` (an intervention with no cargo exchange).
 
-    > **Modelling pitfall.** A negative quantity reverses the effect: a `delivery` of `-100` has the same effect as a `pickup` of `100`. A `delivery` whose order has no `pickup` is assumed loaded at departure.
+    > **Modelling pitfall.** A negative quantity reverses the effect: a `delivery` of `-100` has the same effect as a `pickup` of `100`. A `delivery` whose order has no `pickup` is assumed loaded at departure. With `sharedCapacities: false`, a negative quantity on a `pickup` is also loaded at departure, key by key, minus what the earlier stops of the same order picked up.
 
     """
 
@@ -1098,7 +1098,7 @@ class Error(BaseModel):
 
 class Warning(Error):
     """
-    A warning has the same structure as an `Error`, but a different semantic. It is present when an accepted payload was amended — traffic turned off, crow-fly forced, `maxOptimizationDuration` clamped, and so on. The amended field and the applied change are described by `properties.path` and `properties.details`.
+    A warning has the same structure as an `Error`, but a different semantic. It is present when an accepted payload was amended. Currently, the API makes three amendments. In the sandbox, it turns traffic off and forces crow-fly distances. In every agency, it clamps `maxOptimizationDuration` to the agency's cap. `properties.path` names the amended field and is stable. `properties.details` describes the change in English and contains the internal agency id. It is not stable at the moment, so build any message for a person from `properties.path` and the stored value.
 
     A warning can also flag an accepted value that is probably a mistake, with no amendment: for example, a tag in the `costsByResourceTag` of a `maxCumulatedCost` constraint that no resource carries. `properties.path` then points to that value.
 
@@ -1349,6 +1349,8 @@ class Type25(str, Enum):
 class CapacityViolation(BaseModel):
     """
     Violation of a resource's capacity constraint.
+
+    The engine doesn't generate this violation yet. A tour that goes over a capacity currently comes back with `isValid: false` and no entry in `violations`.
 
     > **Modelling pitfall.** Check `capacity`/`overCapacity` against the fleet's declared capacities: either the resource needs more capacity on that dimension, or the demand should be split across more resources or trips (see [Multi-trip tours](https://developers.kardinal.ai/guides/multi-trip-tours) if reloading at a depot applies).
 
@@ -3514,7 +3516,7 @@ class Plan(BaseModel):
     )
     sharedCapacities: Optional[bool] = Field(
         False,
-        description='Pools a capacity key across all of a resource\'s assigned stops for the whole tour, instead of only within a single order.\n\n> **When to use.** For several different orders assigned to the same resource that draw down and top back up the same running balance, such as a limited stock of reusable equipment. Pair it with an `atLeastOneValidCapacity` additional constraint whenever the rule is stronger than "never exceed the ceiling at any single point".\n\n> **Default.** `false`: capacities only interact within a single order.\n',
+        description="Sets how the engine treats a `pickup` whose quantity is negative. A vehicle's ceiling always applies to everything on board, whatever the order, and this flag does not change that.\n\nWith `false`, the engine treats a pickup with a negative quantity as a delivery only. The goods are loaded at departure, and the stop takes them off the vehicle. With `true`, the stop stays a normal pickup that removes load. The pickup of another order can then fill the vehicle before it.\n\n> **When to use.** Only for a model that writes a dump-site stop as a `pickup` with a negative quantity, such as a waste collection truck. Otherwise keep `false`, the recommended setting.\n\n> **Default.** `false`: a pickup with a negative quantity is loaded at departure, then removed at the stop.\n",
     )
     emptyThresholdByCapacityByResourceTag: Optional[Dict[str, Dict[str, float]]] = (
         Field(
