@@ -24,6 +24,19 @@ each release of this SDK) and https://developers.kardinal.ai/reference/changelog
 
 ## Quickstart
 
+You need an API key. Sign-up is self-service, and a key for your `sandbox`
+agency consumes no credits:
+https://developers.kardinal.ai/guides/authentication says how to generate
+one. The SDK reads the key from the `KARDINAL_API_KEY` environment variable:
+
+```bash
+export KARDINAL_API_KEY="<your sandbox API key>"
+kardinal auth check   # optional, with the [cli] extra: shows the key's host and agency
+```
+
+Keep the key out of your source code. To pass it another way, or to switch
+to a production key, see the Configuration section below.
+
 ```python
 from kardinal import Kardinal
 from kardinal.routing import examples
