@@ -18,3 +18,9 @@ except KardinalLimitError as e:
 plan = k.routing.plans.submit(plan_input)
 for warning in plan.warnings:
     print(warning.code, warning.properties)  # for example, maxOptimizationDuration clamped
+
+
+# --- sdks/errors-and-warnings.mdx:177
+import logging
+
+logging.getLogger("kardinal").setLevel(logging.ERROR)

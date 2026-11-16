@@ -41,12 +41,17 @@ plan = k.routing.plans.update(plan)  # same id, new version
 solution = k.routing.solutions.wait(plan.id, timeout=60)  # sandbox value; in production, allow more than the plan's maxOptimizationDuration
 
 
-# --- sdks/plan-lifecycle.mdx:157
+# --- sdks/plan-lifecycle.mdx:159
+new_input = examples.small_delivery_plan()  # rebuilt from your own data
+replaced = k.routing.plans.replace(plan.id, new_input)  # same id
+
+
+# --- sdks/plan-lifecycle.mdx:182
 k.routing.plans.stop(plan.id)   # stop the optimization in progress
 k.routing.plans.start(plan.id)  # restart it, on the same version
 
 
-# --- sdks/plan-lifecycle.mdx:175
+# --- sdks/plan-lifecycle.mdx:202
 page = k.routing.plans.list(page=1, items_per_page=20)
 print(page.total, page.total_pages, page.next_page)
 
@@ -54,5 +59,5 @@ for light_plan in k.routing.plans.iter_all():  # every page, one plan at a time
     print(light_plan.id, light_plan.state)
 
 
-# --- sdks/plan-lifecycle.mdx:201
+# --- sdks/plan-lifecycle.mdx:228
 k.routing.plans.delete(plan.id)

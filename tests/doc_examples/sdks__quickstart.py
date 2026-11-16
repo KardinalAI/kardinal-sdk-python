@@ -1,6 +1,6 @@
 # Copied from sdks/quickstart.mdx by scripts/sync_doc_examples.py: do not edit by hand.
 
-# --- sdks/quickstart.mdx:45
+# --- sdks/quickstart.mdx:49
 from kardinal import Kardinal
 from kardinal.routing import examples
 
@@ -9,7 +9,7 @@ plan = k.routing.plans.submit(examples.small_delivery_plan())
 solution = k.routing.solutions.wait(plan.id, timeout=60)  # returns in about 20 seconds
 
 
-# --- sdks/quickstart.mdx:72
+# --- sdks/quickstart.mdx:76
 print(solution.final_state)  # optimized, or interrupted/stopped if cut short
 for tour in solution.tours or []:  # tours is None when no stop could be planned
     print(tour.resourceId)
