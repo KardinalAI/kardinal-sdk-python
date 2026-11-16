@@ -9,14 +9,13 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 _GENERATED = _ROOT / "kardinal" / "routing" / "models"
 
-# Internal environments and hosts, the GitLab path, a fake key format (API
+# Internal environments and hosts (the public Console is fine), the GitLab path, a fake key format (API
 # keys are JWTs), the webhook endpoints (x-excluded from the public spec),
 # a performance claim nobody verified, and CONTRIBUTING.md (maintainer
 # notes, not shipped in the package: a dead reference on pypi.org).
 _FORBIDDEN = [
     r"contributing\.md",
     r"sk-",
-    r"console",
     r"per-deployment",
     r"plt\.",
     r"gitlab",

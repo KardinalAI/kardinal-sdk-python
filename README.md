@@ -24,10 +24,12 @@ each release of this SDK) and https://developers.kardinal.ai/reference/changelog
 
 ## Quickstart
 
-You need an API key. Sign-up is self-service, and a key for your `sandbox`
-agency consumes no credits:
-https://developers.kardinal.ai/guides/authentication says how to generate
-one. The SDK reads the key from the `KARDINAL_API_KEY` environment variable:
+You need an API key. Sign up on the Console (https://console.kardinal.ai),
+then generate a key for your `sandbox` agency under **API Keys**. A sandbox
+key consumes no credits. The Console shows the key only once, so copy it
+right away. https://developers.kardinal.ai/guides/authentication has the
+details. The SDK reads the key from the `KARDINAL_API_KEY` environment
+variable:
 
 ```bash
 export KARDINAL_API_KEY="<your sandbox API key>"
