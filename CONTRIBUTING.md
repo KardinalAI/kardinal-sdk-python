@@ -207,6 +207,9 @@ each stack:
   are plain values), a break the TypeScript SDK never had; each SDK
   follows its own numbering.
 - Pre-releases: TestPyPI here, the npm `next` dist-tag there.
+- Docs links in errors: here, `KardinalAuthError`, `KardinalLimitError`,
+  `KardinalForbiddenError` and `KardinalValidationError` carry `docs_url`,
+  and their message ends with it. The TypeScript SDK doesn't have them yet.
 
 ### What we don't want
 

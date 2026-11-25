@@ -320,6 +320,11 @@ Every exception carries `.code`, `.status`, `.request_id`, `.retryable`,
 the response; `.details` is the `properties.details` of the error `.code`
 came from, the only way to tell apart errors that share a code.
 
+`KardinalAuthError`, `KardinalLimitError`, `KardinalForbiddenError` and
+`KardinalValidationError` also carry `.docs_url`, the docs page that says
+what to do about them. Their message ends with that link, on a line of its
+own. `.docs_url` is `None` on the other exceptions.
+
 The API answers every refusal with a 403 `NOT_ALLOWED`, so the SDK sorts a
 403 by what the response carries. `KardinalLimitError` is what a 403 becomes
 when a limit was hit, and `.details` says which one. Two 403s that are not
