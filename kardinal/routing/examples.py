@@ -129,7 +129,9 @@ def cold_chain_plan() -> PlanCreate:
         # Truck with a worked-hours cost, a break rule and a preferred sector.
         models.Resource(
             id="truck-1",
-            vehicleProfile=models.VehicleProfileTruck(type="truck", withTraffic=True),
+            vehicleProfile=models.VehicleProfileTruck(
+                type="truck", withTraffic=True, grossWeight=7500
+            ),
             workingTimeWindow=models.TimeWindow(
                 begin=at("05:00"), end=at("20:00")
             ),
@@ -156,7 +158,7 @@ def cold_chain_plan() -> PlanCreate:
         *[
             models.Resource(
                 id=f"driver-{i}",
-                vehicleProfile=models.VehicleProfileTruck(type="truck"),
+                vehicleProfile=models.VehicleProfileCar(type="car"),
                 workingTimeWindow=models.TimeWindow(
                     begin=at("07:00"), end=at("17:00")
                 ),

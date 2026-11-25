@@ -3,7 +3,7 @@
   "resources": [
     {
       "id": "truck-1",
-      "vehicleProfile": { "type": "truck", "withTraffic": true },
+      "vehicleProfile": { "type": "truck", "withTraffic": true, "grossWeight": 7500 },
       "workingTimeWindow": { "begin": "2026-08-03 05:00", "end": "2026-08-03 20:00" },
       "departure": { "lon": 2.295, "lat": 48.872 },
       "arrival": { "lon": 2.295, "lat": 48.872 },
@@ -16,7 +16,7 @@
     },
     {
       "id": "driver-1",
-      "vehicleProfile": { "type": "truck" },
+      "vehicleProfile": { "type": "car" },
       "workingTimeWindow": { "begin": "2026-08-03 07:00", "end": "2026-08-03 17:00" },
       "departure": { "lon": 2.295, "lat": 48.872 },
       "arrival": { "lon": 2.295, "lat": 48.872 },
@@ -25,7 +25,7 @@
     },
     {
       "id": "driver-2",
-      "vehicleProfile": { "type": "truck" },
+      "vehicleProfile": { "type": "car" },
       "workingTimeWindow": { "begin": "2026-08-03 07:00", "end": "2026-08-03 17:00" },
       "departure": { "lon": 2.295, "lat": 48.872 },
       "arrival": { "lon": 2.295, "lat": 48.872 },

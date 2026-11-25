@@ -2410,9 +2410,9 @@ class VehicleProfileTruck(BaseModel):
     """
     Everything the `car` profile has, plus weight, dimensions, hazardous-goods, and toll/tunnel/highway parameters, for respecting road restrictions on heavy or hazardous-goods vehicles.
 
-    > **When to use.** A vehicle-type name that is itself an unambiguous heavy-vehicle designation (a truck, lorry, semi-trailer, tractor-trailer, or equivalent) is sufficient evidence to pick `truck` even with no numeric dimensions yet.
+    > **When to use.** Pick `truck` for a vehicle that a standard driving licence does not cover. In the EU, that is a vehicle over 3.5 t gross weight, such as a lorry, a semi-trailer or a heavy goods vehicle. Pick `truck` even when its dimensions are not known yet. Decide on the weight or the licence category, not on a word in the vehicle's name: a pickup truck is a `car`.
 
-    > **Default.** Setting `type: "truck"` and leaving every truck-only field unset does not apply any default legal-truck-road restriction; routing behaves exactly like `car` until one of those fields is actually set. Default to `car` when a vehicle's dimensions are genuinely unknown, and switch to `truck` once real dimensions or road restrictions are available.
+    > **Default.** When the data says nothing about the vehicle, use `car` and flag the choice as an assumption. In production, a `truck` with no truck-only field set can give longer travel times than `car` on the same trip. Once you know the gross weight and the dimensions, set them on the `truck` profile.
 
     > **Modelling pitfall.** `height`, `width`, and `length` are whole centimetres, not metres: a truck 3.8 m tall is `height: 380`. A value in metres that happens to be a whole number, such as `length: 12`, raises no error and is read as 12 centimetres, so the vehicle's size no longer restricts its route. A decimal such as `4.2` is refused with a `400`. Round after converting from metres, for example `round(width_m * 100)`, because `2.55 * 100` is not exactly `255` in floating-point arithmetic.
 
