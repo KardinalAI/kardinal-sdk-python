@@ -382,11 +382,22 @@ When the API accepts a plan but amends part of it, `submit()`, `update()` and
 ```python
 plan = k.routing.plans.submit(plan_input)
 for warning in plan.warnings:
-    print(warning.code, warning.properties)   # e.g. maxOptimizationDuration clamped
+    print((warning.properties or {}).get("path"))   # e.g. maxOptimizationDuration
 ```
 
 Read them from that return value: warnings aren't stored with the plan, so
 a later `get()` never returns them, only the amended value.
+
+Read `properties.path` to know what the API changed. Every amendment
+currently has the code `INVALID_VALUE` and the message `The field value is
+not valid.`, so neither tells you what happened. `properties` is a dict and
+can be `None`, so `warning.properties.path` raises an `AttributeError`.
+`properties.details` is English text that contains the internal agency id,
+and it isn't stable. Don't show `details` or `message` to the planner. Build
+your own message from the path and from the value stored at that path in
+the returned plan. See
+https://developers.kardinal.ai/sdks/errors-and-warnings#warnings-on-successful-calls
+for the three amendments the API makes today.
 
 The same three methods also log each kind of warning once, on the `kardinal`
 logger at the `WARNING` level. You need no logging setup to see the line:
