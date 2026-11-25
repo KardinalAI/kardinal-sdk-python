@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import typer
+try:
+    import typer
+except ImportError as exc:
+    # WHY: the `kardinal` command is installed with the library, but typer and click
+    # come only with the `cli` extra.
+    raise SystemExit(
+        'The kardinal command needs the cli extra: pip install "kardinal-ai[cli]"'
+    ) from exc
 
 from ._core.cli import cli_client, emit, fail
 from ._core.errors import KardinalError
