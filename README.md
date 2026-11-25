@@ -8,6 +8,12 @@ pip install kardinal-ai          # library only
 pip install "kardinal-ai[cli]"   # + the `kardinal` command
 ```
 
+Using a coding agent? Run `kardinal init` at the root of your repository
+(it needs the `cli` extra). It writes a skill for this SDK to
+`.claude/skills/kardinal-python/SKILL.md` (Claude Code) and to
+`.agents/skills/kardinal-python/SKILL.md` (Codex, Mistral Vibe). The skill
+lists the pitfalls of this SDK and links to the modeling rules in the docs.
+
 The package is published as `kardinal-ai`, but you import it as `kardinal`
 (`from kardinal import Kardinal`) and the command is `kardinal`. Python 3.10
 or later.

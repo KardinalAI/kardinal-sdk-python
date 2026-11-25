@@ -1,5 +1,11 @@
 """Route optimization: plans, solutions, and their models.
 
+Using a coding agent? Run `kardinal init` at the root of your repository
+(it needs the `cli` extra). It writes a skill for this SDK to
+`.claude/skills/kardinal-python/SKILL.md` (Claude Code) and to
+`.agents/skills/kardinal-python/SKILL.md` (Codex, Mistral Vibe). The skill
+lists the pitfalls of this SDK and links to the modeling rules in the docs.
+
 `unknown_fields(plan)` is the check `submit()` makes, exposed so a caller
 can run it before sending — the CLI has `validate`, and the library had no
 equivalent once `submit()` started raising on an unknown key.
