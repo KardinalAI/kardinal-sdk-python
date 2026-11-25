@@ -60,7 +60,10 @@ def test_plan_size_limit_is_a_limit_error_whatever_the_first_error_code() -> Non
     exc = from_response(status=403, request_id=None, errors=errors)
     assert isinstance(exc, KardinalLimitError)
     assert exc.code == "NOT_ALLOWED"
-    assert str(exc) == "The requested action is not allowed."
+    assert str(exc) == (
+        "The requested action is not allowed.\n"
+        "See https://developers.kardinal.ai/sdks/errors-and-warnings#quotas-and-rate-limits"
+    )
     assert exc.details == "The resulting plan violates the quotas configuration of the agency"
     assert exc.errors == errors
 
@@ -367,3 +370,36 @@ def test_the_exact_text_under_another_code_is_not_an_auth_error() -> None:
     exc = from_response(status=403, request_id=None, errors=errors)
     assert isinstance(exc, KardinalForbiddenError)
     assert not isinstance(exc, KardinalAuthError)
+
+
+_DOCS = "https://developers.kardinal.ai"
+
+
+@pytest.mark.parametrize(
+    ("status", "errors", "family", "page"),
+    [
+        (401, _error("NOT_AUTHENTICATED"), KardinalAuthError, "/sdks/configuration#troubleshooting-authentication"),
+        (400, _error("INVALID_VALUE"), KardinalValidationError, "/sdks/errors-and-warnings#validation-errors"),
+        (
+            403,
+            [{"code": "NOT_ALLOWED", "message": "boom", "properties": {"details": "Insufficient credits"}}],
+            KardinalLimitError,
+            "/sdks/errors-and-warnings#quotas-and-rate-limits",
+        ),
+        (403, _error("NOT_ALLOWED"), KardinalForbiddenError, "/sdks/errors-and-warnings#quotas-and-rate-limits"),
+    ],
+)
+def test_the_frequent_errors_link_to_the_docs_page_that_explains_them(status, errors, family, page) -> None:
+    """A person or an agent reading a traceback gets the page that says what
+    to do, on the line after the API's message.
+    """
+    exc = from_response(status=status, request_id=None, errors=errors)
+    assert isinstance(exc, family)
+    assert exc.docs_url == _DOCS + page
+    assert str(exc) == f"boom\nSee {_DOCS}{page}"
+
+
+def test_an_error_with_no_docs_page_keeps_the_api_message_alone() -> None:
+    exc = from_response(status=500, request_id=None, errors=_error("INTERNAL_SERVER_ERROR"))
+    assert exc.docs_url is None
+    assert str(exc) == "boom"

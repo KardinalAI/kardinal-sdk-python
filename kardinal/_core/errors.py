@@ -1,7 +1,7 @@
 """Exception hierarchy, organized by family.
 
 Every public exception carries `code`, `status`, `request_id`, `retryable`,
-`warnings`, `errors`, `details`. `retryable` is computed here — the API doesn't provide it. An
+`warnings`, `errors`, `details`, `docs_url`. `retryable` is computed here — the API doesn't provide it. An
 unrecognized `code` falls back to the family deduced from the HTTP status
 rather than disappearing, since `Error.code` in openapi.yaml documents that
 new codes may be added in a future non-breaking release.
@@ -32,8 +32,18 @@ from __future__ import annotations
 from typing import Any, List, Optional, Sequence, Type
 
 
+_DOCS = "https://developers.kardinal.ai"
+
+
 class KardinalError(Exception):
-    """Base of every exception this SDK raises for a failed API call."""
+    """Base of every exception this SDK raises for a failed API call.
+
+    `docs_url` is the docs page that says what to do about this family of
+    errors. It is `None` when no page covers it. When it is set, the message
+    ends with it, on a line of its own.
+    """
+
+    docs_url: Optional[str] = None
 
     def __init__(
         self,
@@ -46,6 +56,8 @@ class KardinalError(Exception):
         warnings: Optional[List[dict]] = None,
         errors: Optional[List[dict]] = None,
     ) -> None:
+        if self.docs_url:
+            message = f"{message}\nSee {self.docs_url}"
         super().__init__(message)
         self.code = code
         self.status = status
@@ -74,6 +86,8 @@ class KardinalAuthError(KardinalError):
     invalid` for a key that was revoked or regenerated.
     """
 
+    docs_url = _DOCS + "/sdks/configuration#troubleshooting-authentication"
+
 
 class KardinalLimitError(KardinalError):
     """A 403 (`NOT_ALLOWED`) recognised as a limit of the agency — a
@@ -95,6 +109,8 @@ class KardinalLimitError(KardinalError):
     allowed value.
     """
 
+    docs_url = _DOCS + "/sdks/errors-and-warnings#quotas-and-rate-limits"
+
 
 class KardinalForbiddenError(KardinalError):
     """A 403 this SDK can't classify: none of the clues of a limit, and
@@ -107,6 +123,8 @@ class KardinalForbiddenError(KardinalError):
     the same answer.
     """
 
+    docs_url = _DOCS + "/sdks/errors-and-warnings#quotas-and-rate-limits"
+
 
 class KardinalValidationError(KardinalError):
     """One of the 7 business codes returned under 400, or an archived plan
@@ -118,6 +136,8 @@ class KardinalValidationError(KardinalError):
     them all, not just the first. The archived-plan 403 is different: its
     `.errors` holds one `NOT_ALLOWED` error with no field path.
     """
+
+    docs_url = _DOCS + "/sdks/errors-and-warnings#validation-errors"
 
 
 class UnknownFieldWarning(UserWarning):
