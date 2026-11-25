@@ -794,3 +794,23 @@ def test_allow_unknown_makes_validate_agree_with_submit(tmp_path) -> None:
     ok = runner.invoke(app, [*args, "--allow-unknown", "aNewApiField"])
     assert ok.exit_code == 0, ok.stdout
     assert "OK" in ok.stdout
+
+
+def test_without_the_cli_extra_the_command_says_how_to_install_it() -> None:
+    """`kardinal` is installed with the library, but typer and click come with
+    the `cli` extra only. Without them, the command prints the install line
+    instead of a `ModuleNotFoundError` traceback. Simulated in a subprocess
+    by making `import typer` fail.
+    """
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; sys.modules['typer'] = None; from kardinal.cli import app",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert 'pip install "kardinal-ai[cli]"' in result.stderr
+    assert "Traceback" not in result.stderr
