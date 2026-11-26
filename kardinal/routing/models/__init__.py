@@ -400,10 +400,7 @@ class TimeWindowBreak(BaseModel):
         pattern='^P(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(\\d+H)?(\\d+M)?(\\d+S)?)?$',
     )
     timeWindow: TimeWindow = Field(
-        ...,
-        examples=[
-            {'begin': '2026-03-17T12:00:00+01:00', 'end': '2026-03-17T13:00:00+01:00'}
-        ],
+        ..., examples=[{'begin': '2026-03-17 12:00', 'end': '2026-03-17 13:00'}]
     )
 
 
@@ -2347,16 +2344,12 @@ class SingleStop(BaseModel):
     authorizedTimeWindows: Optional[List[TaggedTimeWindow]] = Field(
         None,
         description='One or more hard time windows for the stop. Outside all of them, the stop cannot be planned at all. Accepts an array, so more than one disjoint hard window is native, for example a site open mornings and again in the evening; the stop is feasible if reachable in any one of them. Modelling an acceptable-if-late window as a hard one fails silently: the stop is simply dropped rather than delivered late.\n\n`begin` and `end` bound the start of service, which is the stop\'s `beginTime` in the solution. They don\'t bound the arrival. A resource that arrives before `begin` waits until `begin`. That wait counts in the tour\'s `waitingDuration`, not as a delay.\n\n> **Modelling pitfall.** A contractual delivery window is not automatically a hard one. Ask what should happen if the fleet cannot hit it: if a late visit is acceptable, use `preferredTimeWindows` instead.\n\n> **Modelling pitfall.** The stop can finish up to `operationDuration` after `end`. To express "must be done and gone by 15:00", subtract `operationDuration` from `end` yourself: for a 15-minute operation, set `end` to `"2026-08-03 14:45"`.\n',
-        examples=[
-            [{'begin': '2026-03-17T08:00:00+01:00', 'end': '2026-03-17T12:00:00+01:00'}]
-        ],
+        examples=[[{'begin': '2026-03-17 08:00', 'end': '2026-03-17 12:00'}]],
     )
     preferredTimeWindows: Optional[List[TaggedTimeWindow]] = Field(
         None,
         description='One or more soft time windows for the stop. A window is soft at its end only: a late start is allowed, and it costs the `minimizeDelay` objective. The delay is the start of service minus the window\'s `end`.\n\nA preferred window is hard at its start. Service never starts before `begin`, and a resource that arrives early waits. A stop whose preferred windows all open after every resource stops working is therefore not planned.\n\nWhen a preferred window closes before the authorized window opens, the stop is served inside the authorized window. The delay is still measured from the `end` of the preferred window. When a preferred window opens after the authorized window closes, the stop is not planned. When a preferred window sits inside a wider authorized window, service waits for the preferred window to open.\n\n> **Modelling pitfall.** A preferred window doesn\'t make the stop reachable at any time. To express "deliver at 21:00 if possible, otherwise earlier", don\'t use a preferred window: it forbids starting before 21:00. Use an `AlternativesStop` with a 21:00 candidate and an earlier candidate whose preferred window ends one minute before its authorized window opens. See [Hard or preferred window](https://developers.kardinal.ai/guides/time-windows#hard-or-preferred-window).\n',
-        examples=[
-            [{'begin': '2026-03-17T09:00:00+01:00', 'end': '2026-03-17T11:00:00+01:00'}]
-        ],
+        examples=[[{'begin': '2026-03-17 09:00', 'end': '2026-03-17 11:00'}]],
     )
 
 
@@ -2365,6 +2358,8 @@ class AlternativesStop(BaseModel):
     A stop composed of different alternative single stops.
 
     All alternatives of a group must have the same `kind`. A candidate without `kind` counts as a `delivery`. A group that mixes kinds is refused with a `400`.
+
+    Each candidate counts as one unique stop for billing, so a group of three candidates costs three credits. See [Pricing and credits](https://developers.kardinal.ai/reference/pricing-and-credits#how-credits-work).
 
     """
 
@@ -3227,9 +3222,7 @@ class Resource(BaseModel):
     workingTimeWindow: TimeWindow = Field(
         ...,
         description='Time window during which the resource is available to work. Often paired with `maxWorkingDuration`, since a wide window does not by itself mean a long shift.\n\n> **Modelling pitfall.** Spanning more than one calendar day does not, on its own, force any rest between working days. Encode daily rest explicitly in `breaks[]`, for example one `timeWindowBreak` per night, with a window longer than the rest. See [Multi-day trips](https://developers.kardinal.ai/guides/multi-day).\n',
-        examples=[
-            {'begin': '2026-03-17T08:00:00+01:00', 'end': '2026-03-17T18:00:00+01:00'}
-        ],
+        examples=[{'begin': '2026-03-17 08:00', 'end': '2026-03-17 18:00'}],
     )
     maxWorkingDuration: Optional[str] = Field(
         None,
@@ -3527,7 +3520,7 @@ class Plan(BaseModel):
     )
     sharedCapacities: Optional[bool] = Field(
         False,
-        description="Sets how the engine treats a `pickup` whose quantity is negative. A vehicle's ceiling always applies to everything on board, whatever the order, and this flag does not change that.\n\nWith `false`, the engine treats a pickup with a negative quantity as a delivery only. The goods are loaded at departure, and the stop takes them off the vehicle. With `true`, the stop stays a normal pickup that removes load. The pickup of another order can then fill the vehicle before it.\n\n> **When to use.** Only for a model that writes a dump-site stop as a `pickup` with a negative quantity, such as a waste collection truck. Otherwise keep `false`, the recommended setting.\n\n> **Default.** `false`: a pickup with a negative quantity is loaded at departure, then removed at the stop.\n",
+        description='Sets how the engine treats a `pickup` whose quantity is negative. A vehicle\'s ceiling always applies to everything on board, whatever the order, and this flag does not change that.\n\nWith `false`, the engine treats a pickup with a negative quantity as a delivery only. The goods are loaded at departure, and the stop takes them off the vehicle. With `true`, the stop stays a normal pickup that removes load. The pickup of another order can then fill the vehicle before it.\n\nFor example, a truck has a `weight` ceiling of 100 kg. It collects a bin of 80 kg with a `pickup` that has `capacities: {"weight": 80}`. The bin is open from 08:00 to 09:00. The dump site is a `pickup` of another order, with `capacities: {"weight": -80}`. The dump site is open from 12:00 to 13:00, so the truck visits the bin first. With `true`, the load is 80 kg after the bin and 0 kg after the dump site. With `false`, the engine would load the 80 kg of the dump site at departure. The load would then reach 160 kg after the bin, over the ceiling. The engine therefore leaves the dump-site stop in `unaffectedStopIds`. The solution shows no violation.\n\n> **When to use.** Set `true` for waste collection, when you write the emptying at the dump site as a `pickup` with a negative quantity. It is the recommended setting for that model. For any other model, keep `false`.\n\n> **Default.** `false`: a pickup with a negative quantity is loaded at departure, then removed at the stop.\n',
     )
     emptyThresholdByCapacityByResourceTag: Optional[Dict[str, Dict[str, float]]] = (
         Field(
