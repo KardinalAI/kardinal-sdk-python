@@ -1,6 +1,6 @@
 # Copied from guides/orders-and-sequences.mdx by scripts/sync_doc_examples.py: do not edit by hand.
 
-# --- guides/orders-and-sequences.mdx:342
+# --- guides/orders-and-sequences.mdx:343
 from kardinal.routing import models
 from kardinal.routing.plans import Order, PlanCreate
 
@@ -51,7 +51,7 @@ plan = PlanCreate(
 )
 
 
-# --- guides/orders-and-sequences.mdx:490
+# --- guides/orders-and-sequences.mdx:491
 def check_orders(plan, solution):
     """Return one message for each order that the engine did not fully serve."""
     served = {

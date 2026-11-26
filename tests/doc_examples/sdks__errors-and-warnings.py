@@ -15,12 +15,20 @@ except KardinalLimitError as e:
 
 
 # --- sdks/errors-and-warnings.mdx:145
+def stored_value(plan, path):
+    value = plan.model_dump(mode="json", exclude_none=True)
+    for key in path.split("."):
+        value = value[int(key)] if isinstance(value, list) else (value or {}).get(key)
+    return value
+
 plan = k.routing.plans.submit(plan_input)
 for warning in plan.warnings:
-    print(warning.code, warning.properties)  # for example, maxOptimizationDuration clamped
+    path = (warning.properties or {}).get("path")
+    if path:
+        print(warning.code, path, stored_value(plan, path))  # for example, INVALID_VALUE maxOptimizationDuration PT6H
 
 
-# --- sdks/errors-and-warnings.mdx:177
+# --- sdks/errors-and-warnings.mdx:191
 import logging
 
 logging.getLogger("kardinal").setLevel(logging.ERROR)

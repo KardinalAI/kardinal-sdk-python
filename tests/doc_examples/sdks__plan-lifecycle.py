@@ -8,7 +8,7 @@ k = Kardinal()
 plan = k.routing.plans.submit(examples.small_delivery_plan())
 print(plan.id, plan.version)
 for warning in plan.warnings:
-    print(warning.code, warning.properties)
+    print(warning.code, (warning.properties or {}).get("path"))
 
 
 # --- sdks/plan-lifecycle.mdx:46

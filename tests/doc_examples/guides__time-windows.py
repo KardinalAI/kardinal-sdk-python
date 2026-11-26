@@ -1,6 +1,6 @@
 # Copied from guides/time-windows.mdx by scripts/sync_doc_examples.py: do not edit by hand.
 
-# --- guides/time-windows.mdx:136
+# --- guides/time-windows.mdx:181
 from kardinal.routing import models
 from kardinal.routing.plans import Order, PlanCreate
 
@@ -43,7 +43,7 @@ plan = PlanCreate(
 )
 
 
-# --- guides/time-windows.mdx:274
+# --- guides/time-windows.mdx:319
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
